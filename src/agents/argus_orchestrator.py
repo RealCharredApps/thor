@@ -1,344 +1,153 @@
-# thor/src/agents/argus_orchestrator.py
+# src/agents/argus_orchestrator.py
 import asyncio
 import json
-import logging
-from typing import Dict, List, Any, Optional
-from pathlib import Path
 import subprocess
-import os
-from dataclasses import dataclass
-import signal
-import psutil
-
-logger = logging.getLogger(__name__)
-
-@dataclass
-class ArgusAgent:
-    """Argus agent configuration"""
-    name: str
-    type: str
-    port: int
-    script_path: str
-    process: Optional[subprocess.Popen] = None
-    status: str = "stopped"
-    capabilities: List[str] = None
+import logging
+from typing import Dict, List, Optional, Any
+from pathlib import Path
+import time
 
 class ArgusOrchestrator:
-    """Orchestrates Argus MCP agents"""
+    """Python wrapper for Argus AI Agent swarm system"""
     
-    def __init__(self, argus_path: str = None):
-        self.argus_path = argus_path or self._find_argus_path()
-        self.agents: Dict[str, ArgusAgent] = {}
-        self.base_port = 8000
-        self.running = False
+    def __init__(self, argus_path: str, config_manager):
+        self.argus_path = Path(argus_path)
+        self.config = config_manager.config
+        self.logger = logging.getLogger(__name__)
+        self.active_agents = {}
+        self.swarm_status = {"active": False, "agents": {}}
         
-        # Define available Argus agents
-        self.agent_configs = {
-            "business": ArgusAgent(
-                name="business",
-                type="business",
-                port=8001,
-                script_path="business-server.js",
-                capabilities=["market_analysis", "business_planning", "competitor_analysis"]
-            ),
-            "legal": ArgusAgent(
-                name="legal",
-                type="legal",
-                port=8002,
-                script_path="legal-server.js",
-                capabilities=["contract_review", "legal_research", "compliance_check"]
-            ),
-            "science": ArgusAgent(
-                name="science",
-                type="science",
-                port=8003,
-                script_path="science-server.js",
-                capabilities=["research", "data_analysis", "hypothesis_testing"]
-            ),
-            "healthcare": ArgusAgent(
-                name="healthcare",
-                type="healthcare",
-                port=8004,
-                script_path="healthcare-server.js",
-                capabilities=["medical_research", "health_analytics", "diagnosis_support"]
-            ),
-            "financial": ArgusAgent(
-                name="financial",
-                type="financial",
-                port=8005,
-                script_path="financial-server.js",
-                capabilities=["financial_analysis", "investment_advice", "risk_assessment"]
-            )
+        # Available MCP servers
+        self.available_mcps = {
+            "legal": "legal-mcp-server.js",
+            "business": "business-mcp-server.js",
+            "financial": "financial-mcp-server.js",
+            "science": "science-mcp-server.js",
+            "healthcare": "healthcare-mcp-server.js"
         }
-        
-        logger.info(f"ArgusOrchestrator initialized with path: {self.argus_path}")
     
-    def _find_argus_path(self) -> str:
-        """Find Argus installation path"""
-        possible_paths = [
-            "./Argus_Ai_Agent_MCPs/",
-            "../Argus_Ai_Agent_MCPs/",
-            "../../Argus_Ai_Agent_MCPs/",
-            os.path.expanduser("~/Argus_Ai_Agent_MCPs/")
-        ]
-        
-        for path in possible_paths:
-            if os.path.exists(path):
-                return os.path.abspath(path)
-        
-        raise FileNotFoundError("Argus MCP directory not found")
-    
-    async def start_orchestrator(self) -> Dict[str, Any]:
-        """Start the Argus orchestrator server"""
+    async def start_orchestrator(self) -> bool:
+        """Start the Argus orchestrator"""
         try:
-            orchestrator_script = os.path.join(self.argus_path, "orchestrator-server.js")
+            orchestrator_path = self.argus_path / "orchestrator-server.js"
+            if not orchestrator_path.exists():
+                self.logger.error(f"Orchestrator not found at {orchestrator_path}")
+                return False
             
-            if not os.path.exists(orchestrator_script):
-                return {"error": f"Orchestrator script not found: {orchestrator_script}"}
-            
-            # Start orchestrator server
-            process = subprocess.Popen(
-                ["node", orchestrator_script],
-                cwd=self.argus_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
+            # Start orchestrator process
+            process = await asyncio.create_subprocess_exec(
+                "node", str(orchestrator_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
             
             self.orchestrator_process = process
-            self.running = True
+            self.swarm_status["active"] = True
+            self.logger.info("Argus orchestrator started successfully")
+            return True
             
-            # Wait a moment for startup
-            await asyncio.sleep(2)
-            
-            if process.poll() is None:
-                logger.info("Argus orchestrator started successfully")
-                return {
-                    "success": True,
-                    "pid": process.pid,
-                    "status": "running"
-                }
-            else:
-                stdout, stderr = process.communicate()
-                return {
-                    "error": "Orchestrator failed to start",
-                    "stdout": stdout,
-                    "stderr": stderr
-                }
-                
         except Exception as e:
-            logger.error(f"Failed to start orchestrator: {str(e)}")
-            return {"error": str(e)}
+            self.logger.error(f"Failed to start orchestrator: {e}")
+            return False
     
-    async def start_agent(self, agent_type: str) -> Dict[str, Any]:
-        """Start a specific Argus agent"""
-        if agent_type not in self.agent_configs:
-            return {"error": f"Unknown agent type: {agent_type}"}
-        
-        if agent_type in self.agents and self.agents[agent_type].status == "running":
-            return {"error": f"Agent {agent_type} already running"}
-        
+    async def deploy_agent(self, agent_type: str, config: Dict[str, Any]) -> bool:
+        """Deploy a specialized agent"""
         try:
-            agent_config = self.agent_configs[agent_type]
-            script_path = os.path.join(self.argus_path, agent_config.script_path)
+            if agent_type not in self.available_mcps:
+                self.logger.error(f"Unknown agent type: {agent_type}")
+                return False
             
-            if not os.path.exists(script_path):
-                return {"error": f"Agent script not found: {script_path}"}
+            mcp_path = self.argus_path / self.available_mcps[agent_type]
+            if not mcp_path.exists():
+                self.logger.error(f"MCP server not found: {mcp_path}")
+                return False
             
-            # Start agent process
-            process = subprocess.Popen(
-                ["node", script_path],
-                cwd=self.argus_path,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env={**os.environ, "PORT": str(agent_config.port)}
+            # Start MCP server
+            process = await asyncio.create_subprocess_exec(
+                "node", str(mcp_path),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE
             )
             
-            # Update agent info
-            agent_config.process = process
-            agent_config.status = "starting"
-            self.agents[agent_type] = agent_config
-            
-            # Wait for startup
-            await asyncio.sleep(2)
-            
-            if process.poll() is None:
-                agent_config.status = "running"
-                logger.info(f"Argus agent {agent_type} started on port {agent_config.port}")
-                return {
-                    "success": True,
-                    "agent_type": agent_type,
-                    "port": agent_config.port,
-                    "pid": process.pid,
-                    "status": "running"
-                }
-            else:
-                stdout, stderr = process.communicate()
-                agent_config.status = "error"
-                return {
-                    "error": f"Agent {agent_type} failed to start",
-                    "stdout": stdout,
-                    "stderr": stderr
-                }
-                
-        except Exception as e:
-            logger.error(f"Failed to start agent {agent_type}: {str(e)}")
-            return {"error": str(e)}
-    
-    async def stop_agent(self, agent_type: str) -> Dict[str, Any]:
-        """Stop a specific Argus agent"""
-        if agent_type not in self.agents:
-            return {"error": f"Agent {agent_type} not found"}
-        
-        agent = self.agents[agent_type]
-        
-        try:
-            if agent.process and agent.process.poll() is None:
-                # Try graceful shutdown first
-                agent.process.terminate()
-                
-                # Wait for graceful shutdown
-                try:
-                    agent.process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    # Force kill if graceful shutdown fails
-                    agent.process.kill()
-                    agent.process.wait()
-                
-                agent.status = "stopped"
-                logger.info(f"Argus agent {agent_type} stopped")
-                
-                return {
-                    "success": True,
-                    "agent_type": agent_type,
-                    "status": "stopped"
-                }
-            else:
-                return {"error": f"Agent {agent_type} not running"}
-                
-        except Exception as e:
-            logger.error(f"Failed to stop agent {agent_type}: {str(e)}")
-            return {"error": str(e)}
-    
-    async def stop_orchestrator(self) -> Dict[str, Any]:
-        """Stop the Argus orchestrator"""
-        try:
-            if hasattr(self, 'orchestrator_process') and self.orchestrator_process:
-                self.orchestrator_process.terminate()
-                self.orchestrator_process.wait(timeout=5)
-                self.running = False
-                logger.info("Argus orchestrator stopped")
-                return {"success": True, "status": "stopped"}
-            else:
-                return {"error": "Orchestrator not running"}
-        except Exception as e:
-            logger.error(f"Failed to stop orchestrator: {str(e)}")
-            return {"error": str(e)}
-    
-    async def get_agent_status(self, agent_type: str = None) -> Dict[str, Any]:
-        """Get status of specific agent or all agents"""
-        if agent_type:
-            if agent_type not in self.agents:
-                return {"error": f"Agent {agent_type} not found"}
-            
-            agent = self.agents[agent_type]
-            return {
-                "agent_type": agent_type,
-                "status": agent.status,
-                "port": agent.port,
-                "capabilities": agent.capabilities,
-                "pid": agent.process.pid if agent.process else None
+            agent_id = f"{agent_type}_{int(time.time())}"
+            self.active_agents[agent_id] = {
+                "type": agent_type,
+                "process": process,
+                "config": config,
+                "status": "active"
             }
-        else:
-            # Return status of all agents
-            status = {}
-            for agent_type, agent in self.agents.items():
-                status[agent_type] = {
-                    "status": agent.status,
-                    "port": agent.port,
-                    "capabilities": agent.capabilities,
-                    "pid": agent.process.pid if agent.process else None
-                }
             
-            return {
-                "orchestrator_running": self.running,
-                "agents": status
+            self.swarm_status["agents"][agent_id] = {
+                "type": agent_type,
+                "status": "active",
+                "pid": process.pid
             }
-    
-    async def execute_task(self, task: str, agent_type: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
-        """Execute a task on a specific agent"""
-        if agent_type not in self.agents:
-            return {"error": f"Agent {agent_type} not available"}
-        
-        agent = self.agents[agent_type]
-        
-        if agent.status != "running":
-            return {"error": f"Agent {agent_type} not running"}
-        
-        try:
-            # In a real implementation, this would make HTTP requests to the agent
-            # For now, simulate the execution
-            await asyncio.sleep(0.5)  # Simulate processing time
             
-            return {
-                "success": True,
-                "agent_type": agent_type,
+            self.logger.info(f"Agent {agent_id} deployed successfully")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to deploy agent {agent_type}: {e}")
+            return False
+    
+    async def orchestrate_swarm(self, task: str, agents: List[str]) -> Dict[str, Any]:
+        """Orchestrate multiple agents for a complex task"""
+        try:
+            # Prepare task for swarm
+            swarm_task = {
                 "task": task,
-                "result": f"Task executed by {agent_type} agent: {task}",
-                "capabilities_used": agent.capabilities[:2] if agent.capabilities else []
+                "agents": agents,
+                "timestamp": time.time(),
+                "coordination_mode": "collaborative"
             }
             
+            # Send to orchestrator
+            result = await self._send_to_orchestrator(swarm_task)
+            
+            self.logger.info(f"Swarm orchestration completed for task: {task}")
+            return result
+            
         except Exception as e:
-            logger.error(f"Task execution failed on {agent_type}: {str(e)}")
+            self.logger.error(f"Swarm orchestration failed: {e}")
             return {"error": str(e)}
     
-    async def health_check(self) -> Dict[str, Any]:
-        """Perform health check on all agents"""
-        health_status = {
-            "orchestrator": "running" if self.running else "stopped",
-            "agents": {}
+    async def _send_to_orchestrator(self, task: Dict) -> Dict:
+        """Send task to orchestrator and get response"""
+        # This would interface with the actual orchestrator
+        # For now, simulate the response
+        return {
+            "status": "completed",
+            "task_id": f"task_{int(time.time())}",
+            "results": f"Processed task: {task['task']}"
         }
-        
-        for agent_type, agent in self.agents.items():
-            if agent.process and agent.process.poll() is None:
-                health_status["agents"][agent_type] = "healthy"
-            else:
-                health_status["agents"][agent_type] = "unhealthy"
-        
-        return health_status
     
-    async def restart_agent(self, agent_type: str) -> Dict[str, Any]:
-        """Restart a specific agent"""
-        # Stop the agent first
-        stop_result = await self.stop_agent(agent_type)
-        if not stop_result.get("success"):
-            return stop_result
+    async def get_swarm_status(self) -> Dict:
+        """Get current swarm status"""
+        # Update agent statuses
+        for agent_id, agent in self.active_agents.items():
+            if agent["process"].returncode is not None:
+                agent["status"] = "stopped"
+                self.swarm_status["agents"][agent_id]["status"] = "stopped"
         
-        # Wait a moment
-        await asyncio.sleep(1)
-        
-        # Start the agent again
-        return await self.start_agent(agent_type)
+        return self.swarm_status
     
-    def shutdown(self):
+    async def shutdown_swarm(self):
         """Shutdown all agents and orchestrator"""
-        logger.info("Shutting down Argus orchestrator...")
-        
-        # Stop all agents
-        for agent_type in list(self.agents.keys()):
-            asyncio.create_task(self.stop_agent(agent_type))
-        
-        # Stop orchestrator
-        if hasattr(self, 'orchestrator_process') and self.orchestrator_process:
-            try:
+        try:
+            # Stop all agents
+            for agent_id, agent in self.active_agents.items():
+                if agent["process"].returncode is None:
+                    agent["process"].terminate()
+                    await agent["process"].wait()
+            
+            # Stop orchestrator
+            if hasattr(self, 'orchestrator_process'):
                 self.orchestrator_process.terminate()
-                self.orchestrator_process.wait(timeout=5)
-            except:
-                try:
-                    self.orchestrator_process.kill()
-                except:
-                    pass
-        
-        self.running = False
-        logger.info("Argus orchestrator shutdown complete")
+                await self.orchestrator_process.wait()
+            
+            self.swarm_status = {"active": False, "agents": {}}
+            self.active_agents = {}
+            self.logger.info("Swarm shutdown completed")
+            
+        except Exception as e:
+            self.logger.error(f"Error during swarm shutdown: {e}")
