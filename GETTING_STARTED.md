@@ -1,195 +1,112 @@
-# 🔨 THOR - Advanced MCP Client for Autonomous Software Development
+# thor/docs/GETTING_STARTED.md
 
-**THOR** has been successfully created in your GitHub directory! This is a comprehensive custom MCP client that rivals Anthropic's console with unlimited autonomous development capabilities.
+# 🚀 Getting Started with THOR
 
-## 🚀 What You Just Built
+## Quick Setup (5 minutes)
 
-THOR is a revolutionary AI development assistant that provides:
-
-- **Unlimited Operations**: No throttling limits - complete entire features without interruption
-- **Expert AI Agents**: 5 specialized agents for different development tasks
-- **Full File System Access**: Read, write, edit, create files and folders on your local machine
-- **MCP Server Integration**: Connect to any MCP server for extended capabilities
-- **Autonomous Development**: Complete complex projects with minimal human intervention
-- **Custom Prompt Engineering**: Advanced prompt management and expert personas
-- **Conversation History**: Persistent chat history with database storage
-- **Project Context**: Automatic project understanding and context awareness
-
-## 📁 Project Structure
-
-```
-thor/
-├── src/                    # Core THOR implementation
-│   ├── core/               # Main ThorClient class
-│   ├── tools/              # Advanced development tools
-│   ├── agents/             # Expert AI agents (extensible)
-│   ├── mcp/                # MCP server integrations
-│   └── ui/                 # User interface components
-├── config/                 # Configuration templates
-├── scripts/                # Setup and utility scripts
-├── docs/                   # Comprehensive documentation
-├── tests/                  # Test suite (ready for expansion)
-├── thor                    # Main executable
-└── README.md               # Project overview
-```
-
-## 🎯 Next Steps to Get Started
-
-### 1. **Set Up Dependencies**
+### 1. Clone and Install
 ```bash
-cd /Users/bbm2/Documents/GitHub/thor
-python3 scripts/setup.py
-```
+git clone https://github.com/RealCharredApps/thor.git
+cd thor
+2. Set API Key
+bashCopyexport ANTHROPIC_API_KEY="your_api_key_here"
+3. Install Dependencies
+bashCopypip install -r requirements.txt
+pip install -e .
+4. Test Installation
+bashCopypython test_thor.py
+5. Start THOR
+bashCopythor --interactive
+Detailed Setup
+Prerequisites
 
-### 2. **Get Your Anthropic API Key**
-- Go to https://console.anthropic.com/
-- Create an API key
-- Set it in your environment:
-```bash
-export ANTHROPIC_API_KEY="your-api-key-here"
-```
+Python 3.8 or higher
+pip package manager
+Anthropic API key (Get one here)
 
-### 3. **Quick Start with New Project**
-```bash
-./scripts/quickstart.sh my-awesome-project
-```
+Installation Options
+Option 1: Quick Setup (Recommended)
+bashCopymake setup
+Option 2: Manual Setup
+bashCopy# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-### 4. **Or Setup for Existing Project**
-```bash
-./thor setup /path/to/your/existing/project
-./thor chat /path/to/your/existing/project
-```
+# Install dependencies
+pip install -r requirements.txt
+pip install -e .
 
-## 🤖 Expert Agents
+# Create directories
+mkdir -p thor/logs thor/memory thor/artifacts
+Option 3: Docker Setup
+bashCopydocker build -t thor .
+docker run -e ANTHROPIC_API_KEY="your_key" -it thor
+Configuration
+Environment Variables
+bashCopy# Required
+export ANTHROPIC_API_KEY="your_api_key_here"
 
-THOR includes 5 specialized AI agents:
+# Optional
+export THOR_LOG_LEVEL="INFO"
+export THOR_ENABLE_SWARM="true"
+export THOR_MONTHLY_BUDGET="5.0"
+Configuration File
+Edit config/thor_config.yaml:
+yamlCopyanthropic_api_key: "${ANTHROPIC_API_KEY}"
+default_model: "claude-3-5-sonnet-20241022"
+enable_swarm: true
+monthly_budget: 5.0
+First Steps
+1. Basic Commands
+bashCopy# Interactive mode
+thor -i
 
-1. **thor_architect** - Master architect for complex software projects
-2. **code_wizard** - Expert programmer for implementation and code quality  
-3. **devops_master** - DevOps expert for infrastructure and deployment
-4. **security_guardian** - Security expert for application protection
-5. **ai_specialist** - AI/ML expert for intelligent application features
+# Single command
+thor -c "list files in current directory"
 
-## 💡 Example Usage
+# With specific model
+thor -c "analyze this code" --model opus-4
+2. File Operations
+bashCopy# In interactive mode
+read requirements.txt
+write hello.py "print('Hello, World!')"
+analyze hello.py
+3. Swarm Operations
+bashCopy# Start swarm
+thor-swarm start --all
 
-### Interactive Development
-```bash
-./thor chat /path/to/project
-```
+# Use swarm
+thor -c "create business plan" --use-swarm
+Common Use Cases
+Code Review
+bashCopythor -c "review this Python file for security issues and optimization opportunities" --task-type security
+Project Setup
+bashCopythor -c "create a new Python project structure with tests, docs, and CI/CD"
+Documentation
+bashCopythor -c "generate comprehensive documentation for this codebase"
+Troubleshooting
+API Key Issues
+bashCopy# Check if set
+echo $ANTHROPIC_API_KEY
 
-Then ask things like:
-- "Create a complete FastAPI application with JWT authentication"
-- "Build a React frontend with modern state management"
-- "Set up a CI/CD pipeline with Docker and GitHub Actions"
-- "Perform a comprehensive security audit"
-- "Optimize this code for performance"
+# Set for current session
+export ANTHROPIC_API_KEY="your_key"
 
-### Autonomous Mode
-Enable autonomous mode for complex multi-step tasks:
-```bash
-./thor chat /path/to/project --auto
-```
+# Set permanently (add to ~/.bashrc or ~/.zshrc)
+echo 'export ANTHROPIC_API_KEY="your_key"' >> ~/.bashrc
+Permission Issues
+bashCopy# Fix permissions
+chmod +x thor/src/thor_main.py
+chmod +x start_thor.sh
+Package Issues
+bashCopy# Reinstall packages
+pip install --force-reinstall -r requirements.txt
 
-Then request complete features:
-```
-Build a complete e-commerce platform with:
-- User authentication and profiles
-- Product catalog with search
-- Shopping cart and checkout
-- Payment integration
-- Admin dashboard
-- API documentation
-- Deployment configuration
-
-Work autonomously and implement everything.
-```
-
-### Project Analysis
-```bash
-# Full project analysis
-./thor analyze /path/to/project --type full
-
-# Security audit
-./thor analyze /path/to/project --type security
-
-# Performance analysis  
-./thor analyze /path/to/project --type performance
-```
-
-## 🛠️ Key Features
-
-### Unlimited Capabilities
-- **No Rate Limiting**: Unlike web interfaces, THOR has no throttling
-- **Complete Task Execution**: Finish entire features without interruption
-- **Parallel Processing**: Handle multiple tasks simultaneously
-- **Autonomous Operation**: Work independently on complex projects
-
-### Advanced Tools
-- **File Operations**: Full CRUD operations on your filesystem
-- **Git Integration**: Complete git workflow automation
-- **Code Analysis**: Deep code quality and security analysis
-- **Test Generation**: Automatic comprehensive test creation
-- **Project Building**: Generate complete project structures
-- **Performance Optimization**: System and code optimization
-
-### Enterprise Ready
-- **Error Handling**: Comprehensive error management
-- **Logging**: Detailed operation logging
-- **Database Storage**: Persistent conversation and project history
-- **Configuration**: Flexible YAML-based configuration
-- **Security**: Secure API key handling and file access
-
-## 🔧 Configuration
-
-Customize THOR by editing `config/config.yml`:
-
-```yaml
-anthropic:
-  model: "claude-3-5-sonnet-20241022"
-  temperature: 0.3
-  max_tokens: 4000
-
-autonomous:
-  enabled: true
-  max_parallel_tasks: 5
-  auto_commit: true
-  backup_before_changes: true
-
-mcp_servers:
-  filesystem:
-    command: "npx"
-    args: ["@modelcontextprotocol/server-filesystem", "."]
-```
-
-## 📚 Documentation
-
-Complete documentation is available in the `docs/` directory:
-
-- **[Installation Guide](docs/installation.md)** - Detailed setup instructions
-- **[Quick Start](docs/quickstart.md)** - Get up and running fast
-- **[Configuration](docs/configuration.md)** - Customize THOR
-- **[API Reference](docs/api.md)** - Programmatic usage
-- **[Examples](docs/examples.md)** - Real-world usage examples
-
-## 🚀 Ready to Transform Your Development
-
-THOR is now ready to revolutionize your software development workflow! You have unlimited autonomous AI assistance that can:
-
-- Build complete applications from scratch
-- Analyze and optimize existing code
-- Set up entire development environments
-- Implement complex features autonomously
-- Provide expert guidance across all domains
-
-**Start developing with god-like AI assistance today!**
-
-```bash
-cd /Users/bbm2/Documents/GitHub/thor
-python3 scripts/setup.py
-export ANTHROPIC_API_KEY="your-api-key"
-./thor setup my-project
-./thor chat my-project
-```
+# Clear cache
+pip cache purge
+Memory Issues
+bashCopy# Limit memory usage
+thor -i --max-memory 1GB
 
 ---
 
