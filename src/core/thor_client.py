@@ -1,503 +1,147 @@
-        """Load and cache project context"""
-        context_data = {
-            "files": [],
-            "structure": {},
-            "dependencies": {},
-            "git_info": {},
-            "last_updated": datetime.now().isoformat()
-        }
+# src/core/thor_client.py
+import os
+import asyncio
+import json
+import logging
+import subprocess
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, List, Optional, Callable
+import anthropic
+from dataclasses import dataclass
+import sqlite3
+import uuid
+
+@dataclass
+class Message:
+    role: str
+    content: str
+    timestamp: datetime
+    metadata: Dict[str, Any] = None
+
+class ThorClient:
+    """THOR AI Development Framework - Core Client"""
+    
+    def __init__(self, config_path: str = None):
+        self.config = self._load_config(config_path)
+        self.anthropic_client = None
+        self.conversation_history = []
+        self.tools_registry = {}
+        self.logger = self._setup_logging()
+        self.db_path = Path.home() / '.thor' / 'thor.db'
+        self.project_root = Path.cwd()
         
-        try:
-            # Scan project files
-            important_extensions = {
-                '.py', '.js', '.ts', '.jsx', '.tsx', '.html', '.css', '.scss',
-                '.json', '.yml', '.yaml', '.md', '.txt', '.sql', '.sh', '.bat',
-                '.dockerfile', '.go', '.rs', '.java', '.cpp', '.c', '.h'
+        # Initialize components
+        self._init_database()
+        self._init_anthropic()
+        self._register_tools()
+        
+    def _load_config(self, config_path: str = None) -> Dict[str, Any]:
+        """Load configuration from file or environment"""
+        if config_path and Path(config_path).exists():
+            import yaml
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f)
+        
+        # Default configuration
+        return {
+            'anthropic': {
+                'api_key': os.getenv('ANTHROPIC_API_KEY'),
+                'model': 'claude-3-5-sonnet-20241022',
+                'max_tokens': 4000
+            },
+            'tools': {
+                'enabled': True,
+                'timeout': 30
+            },
+            'logging': {
+                'level': 'INFO',
+                'file': 'thor.log'
             }
-            
-            for file_path in self.project_root.rglob('*'):
-                if file_path.is_file() and file_path.suffix.lower() in important_extensions:
-                    relative_path = file_path.relative_to(self.project_root)
-                    
-                    # Skip common ignore patterns
-                    if any(part.startswith('.') for part in relative_path.parts):
-                        continue
-                    if any(part in ['node_modules', '__pycache__', '.git', 'venv', 'env'] for part in relative_path.parts):
-                        continue
-                    
-                    file_info = {
-                        "path": str(relative_path),
-                        "size": file_path.stat().st_size,
-                        "modified": datetime.fromtimestamp(file_path.stat().st_mtime).isoformat(),
-                        "type": file_path.suffix[1:] if file_path.suffix else "unknown"
-                    }
-                    context_data["files"].append(file_info)
-            
-            # Get git information
-            try:
-                git_status = await self._tool_git_status()
-                if git_status.get("success"):
-                    context_data["git_info"] = {
-                        "status": git_status.get("stdout", ""),
-                        "branch": await self._get_git_branch(),
-                        "remote": await self._get_git_remote()
-                    }
-            except:
-                pass
-            
-            # Cache in database
-            conn = sqlite3.connect(str(Path(self.project_root) / self.database_path))
-            cursor = conn.cursor()
-            
-            cursor.execute('''
-                INSERT OR REPLACE INTO project_context 
-                (id, file_path, content_hash, last_modified, metadata)
-                VALUES (?, ?, ?, ?, ?)
-            ''', (
-                "project_overview",
-                "project_context.json",
-                hashlib.md5(json.dumps(context_data).encode()).hexdigest(),
-                datetime.now(),
-                json.dumps(context_data)
-            ))
-            
-            conn.commit()
-            conn.close()
-            
-        except Exception as e:
-            self.logger.warning(f"Could not load full project context: {e}")
-    
-    async def _health_check(self) -> Dict[str, Any]:
-        """Perform comprehensive health check"""
-        health = {
-            "status": "healthy",
-            "timestamp": datetime.now().isoformat(),
-            "components": {},
-            "warnings": [],
-            "errors": []
         }
-        
-        # Check MCP servers
-        for server_name, process in self.mcp_servers.items():
-            if process.returncode is None:
-                health["components"][f"mcp_{server_name}"] = "running"
-            else:
-                health["components"][f"mcp_{server_name}"] = "stopped"
-                health["errors"].append(f"MCP server {server_name} is not running")
-        
-        # Check Anthropic API
-        try:
-            test_message = await asyncio.to_thread(
-                self.anthropic_client.messages.create,
-                model="claude-3-5-sonnet-20241022",
-                max_tokens=10,
-                messages=[{"role": "user", "content": "test"}]
-            )
-            health["components"]["anthropic_api"] = "connected"
-        except Exception as e:
-            health["components"]["anthropic_api"] = "error"
-            health["errors"].append(f"Anthropic API error: {str(e)}")
-        
-        # Check filesystem access
-        try:
-            test_file = self.project_root / "thor_health_check.tmp"
-            test_file.write_text("test")
-            test_file.unlink()
-            health["components"]["filesystem"] = "accessible"
-        except Exception as e:
-            health["components"]["filesystem"] = "error"
-            health["errors"].append(f"Filesystem error: {str(e)}")
-        
-        # Check database
-        try:
-            conn = sqlite3.connect(str(Path(self.project_root) / self.database_path))
-            cursor = conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM conversations")
-            conn.close()
-            health["components"]["database"] = "accessible"
-        except Exception as e:
-            health["components"]["database"] = "error"
-            health["errors"].append(f"Database error: {str(e)}")
-        
-        # Determine overall status
-        if health["errors"]:
-            health["status"] = "degraded" if len(health["errors"]) < 2 else "unhealthy"
-        
-        return health
     
-    async def chat(self, 
-                   message: str,
-                   agent: str = "thor_architect",
-                   model: str = None,
-                   temperature: float = None,
-                   max_tokens: int = None,
-                   include_context: bool = True,
-                   use_tools: bool = True,
-                   autonomous: bool = False) -> str:
-        """
-        Advanced chat with unlimited capabilities
-        """
+    def _setup_logging(self) -> logging.Logger:
+        """Setup logging configuration"""
+        logger = logging.getLogger('THOR')
+        logger.setLevel(getattr(logging, self.config['logging']['level']))
         
-        # Get agent configuration
-        if agent not in self.expert_agents:
-            agent = "thor_architect"
+        # Console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
         
-        expert = self.expert_agents[agent]
+        # File handler
+        log_dir = Path.home() / '.thor' / 'logs'
+        log_dir.mkdir(parents=True, exist_ok=True)
+        fh = logging.FileHandler(log_dir / self.config['logging']['file'])
+        fh.setLevel(logging.DEBUG)
         
-        # Use agent defaults or override
-        model = model or self.config.get("anthropic", {}).get("model", "claude-3-5-sonnet-20241022")
-        temperature = temperature if temperature is not None else expert.temperature
-        max_tokens = max_tokens or expert.max_tokens
+        # Formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        ch.setFormatter(formatter)
+        fh.setFormatter(formatter)
         
-        try:
-            self.console.print(f"[bold cyan]🤖 {expert.name.replace('_', ' ').title()} is thinking...[/bold cyan]")
-            
-            # Build system prompt
-            system_prompt = expert.system_prompt
-            
-            # Add project context if requested
-            if include_context:
-                project_context = await self._get_project_context()
-                system_prompt += f"\n\nCurrent Project Context:\n{project_context}"
-            
-            # Add tool descriptions
-            if use_tools:
-                tools_description = self._get_tools_description()
-                system_prompt += f"\n\nAvailable Tools:\n{tools_description}"
-            
-            # Prepare tools for Claude API
-            tools = self._prepare_anthropic_tools() if use_tools else None
-            
-            # Create conversation message
-            user_msg = ConversationMessage(
-                id=str(uuid.uuid4()),
-                role="user",
-                content=message,
-                timestamp=datetime.now(),
-                agent=agent,
-                metadata={"model": model, "temperature": temperature}
-            )
-            
-            # Call Claude API
-            messages = [{"role": "user", "content": message}]
-            
-            response = await asyncio.to_thread(
-                self.anthropic_client.messages.create,
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=messages,
-                tools=tools
-            )
-            
-            # Handle tool calls iteratively until completion
-            final_response = ""
-            tool_call_count = 0
-            max_tool_calls = 20  # Prevent infinite loops
-            
-            while True:
-                if response.content and response.content[-1].type == "tool_use":
-                    if tool_call_count >= max_tool_calls:
-                        final_response += "\n\n[Note: Maximum tool call limit reached]"
-                        break
-                    
-                    tool_results = []
-                    
-                    # Execute all tool calls in this response
-                    for content_block in response.content:
-                        if content_block.type == "text":
-                            final_response += content_block.text
-                        elif content_block.type == "tool_use":
-                            tool_name = content_block.name
-                            tool_args = content_block.input
-                            
-                            self.console.print(f"[yellow]🔧 Executing: {tool_name}[/yellow]")
-                            
-                            try:
-                                if tool_name in self.tools_registry:
-                                    result = await self.tools_registry[tool_name](**tool_args)
-                                else:
-                                    result = f"Unknown tool: {tool_name}"
-                                
-                                tool_results.append({
-                                    "tool_use_id": content_block.id,
-                                    "content": str(result)
-                                })
-                                
-                                self.logger.info(f"Tool executed: {tool_name}")
-                                
-                            except Exception as e:
-                                self.logger.error(f"Tool execution error ({tool_name}): {e}")
-                                tool_results.append({
-                                    "tool_use_id": content_block.id,
-                                    "content": f"Error executing {tool_name}: {str(e)}",
-                                    "is_error": True
-                                })
-                    
-                    # Continue conversation with tool results
-                    messages.extend([
-                        {"role": "assistant", "content": response.content},
-                        {"role": "user", "content": tool_results}
-                    ])
-                    
-                    # Get next response
-                    response = await asyncio.to_thread(
-                        self.anthropic_client.messages.create,
-                        model=model,
-                        max_tokens=max_tokens,
-                        temperature=temperature,
-                        system=system_prompt,
-                        messages=messages,
-                        tools=tools
-                    )
-                    
-                    tool_call_count += 1
-                    
-                else:
-                    # No more tool calls, get final text response
-                    if response.content:
-                        final_response += response.content[0].text
-                    break
-            
-            # Save conversation
-            assistant_msg = ConversationMessage(
-                id=str(uuid.uuid4()),
-                role="assistant", 
-                content=final_response,
-                timestamp=datetime.now(),
-                agent=agent,
-                metadata={"model": model, "temperature": temperature, "tool_calls": tool_call_count}
-            )
-            
-            self.conversation_history.extend([user_msg, assistant_msg])
-            self._save_conversation_messages([user_msg, assistant_msg])
-            
-            # If autonomous mode requested, queue follow-up tasks
-            if autonomous:
-                await self._extract_and_queue_tasks(final_response, agent)
-            
-            return final_response
-            
-        except Exception as e:
-            self.logger.error(f"Chat error: {e}")
-            return f"Error: {str(e)}"
+        logger.addHandler(ch)
+        logger.addHandler(fh)
+        
+        return logger
     
-    async def _get_project_context(self, max_files: int = 30) -> str:
-        """Get comprehensive project context"""
-        context_parts = []
+    def _init_database(self):
+        """Initialize SQLite database"""
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
         
-        try:
-            # Get project structure
-            structure = await self._tool_list_files(".", "*")
-            important_files = [f for f in structure if self._is_important_file(f)]
-            
-            context_parts.append(f"Project: {self.project_root.name}")
-            context_parts.append(f"Total files: {len(important_files)}")
-            context_parts.append("\nKey files:")
-            
-            for file in important_files[:max_files]:
-                context_parts.append(f"  - {file}")
-            
-            if len(important_files) > max_files:
-                context_parts.append(f"  ... and {len(important_files) - max_files} more files")
-            
-            # Get git status
-            try:
-                git_status = await self._tool_git_status()
-                if git_status.get("success") and git_status.get("stdout"):
-                    context_parts.append(f"\nGit status:\n{git_status['stdout']}")
-            except:
-                pass
-            
-            # Get package/dependency info
-            for config_file in ["package.json", "requirements.txt", "pyproject.toml", "Cargo.toml", "go.mod"]:
-                try:
-                    content = await self._tool_read_file(config_file)
-                    context_parts.append(f"\n{config_file}:")
-                    # Truncate if too long
-                    if len(content) > 500:
-                        context_parts.append(content[:500] + "...")
-                    else:
-                        context_parts.append(content)
-                    break
-                except:
-                    continue
-            
-        except Exception as e:
-            context_parts.append(f"Error getting project context: {e}")
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
         
-        return "\n".join(context_parts)
+        # Conversations table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS conversations (
+                id TEXT PRIMARY KEY,
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                metadata TEXT
+            )
+        ''')
+        
+        # Tools usage table
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS tool_usage (
+                id TEXT PRIMARY KEY,
+                tool_name TEXT NOT NULL,
+                arguments TEXT,
+                result TEXT,
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        conn.commit()
+        conn.close()
+        
+        self.logger.info("Database initialized")
     
-    def _is_important_file(self, file_path: str) -> bool:
-        """Check if file is important for context"""
-        important_patterns = [
-            r'.*\.(py|js|ts|jsx|tsx|go|rs|java|cpp|c|h)$',
-            r'.*\.(json|yml|yaml|toml|ini|cfg)$',
-            r'.*(README|LICENSE|CHANGELOG|TODO).*',
-            r'.*(Dockerfile|docker-compose|Makefile|CMakeLists).*',
-            r'.*\.(md|txt)$'
-        ]
+    def _init_anthropic(self):
+        """Initialize Anthropic client"""
+        api_key = self.config['anthropic']['api_key']
+        if not api_key:
+            raise ValueError("ANTHROPIC_API_KEY not found. Set it in environment or config.")
         
-        import re
-        return any(re.match(pattern, file_path, re.IGNORECASE) for pattern in important_patterns)
+        self.anthropic_client = anthropic.Anthropic(api_key=api_key)
+        self.logger.info("Anthropic client initialized")
     
-    def _get_tools_description(self) -> str:
-        """Get description of available tools"""
-        descriptions = []
-        
-        tool_categories = {
-            "File Operations": ["read_file", "write_file", "create_directory", "list_files", "search_files"],
-            "Git Operations": ["git_status", "git_diff", "git_add", "git_commit", "git_push"],
-            "Code Analysis": ["analyze_code", "generate_tests", "refactor_code", "format_code"],
-            "Project Management": ["create_project_structure", "install_dependencies", "build_project"],
-            "System Operations": ["run_command", "monitor_system", "optimize_performance"]
+    def _register_tools(self):
+        """Register available tools"""
+        self.tools_registry = {
+            'read_file': self._tool_read_file,
+            'write_file': self._tool_write_file,
+            'list_files': self._tool_list_files,
+            'create_directory': self._tool_create_directory,
+            'run_command': self._tool_run_command,
+            'search_files': self._tool_search_files,
+            'analyze_code': self._tool_analyze_code,
         }
-        
-        for category, tools in tool_categories.items():
-            available_tools = [tool for tool in tools if tool in self.tools_registry]
-            if available_tools:
-                descriptions.append(f"{category}: {', '.join(available_tools)}")
-        
-        return "\n".join(descriptions)
-    
-    def _prepare_anthropic_tools(self) -> List[Dict[str, Any]]:
-        """Prepare tools for Anthropic API"""
-        return [
-            {
-                "name": "read_file",
-                "description": "Read the contents of a file",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {"type": "string", "description": "Path to the file to read"}
-                    },
-                    "required": ["file_path"]
-                }
-            },
-            {
-                "name": "write_file", 
-                "description": "Write content to a file",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {"type": "string", "description": "Path to the file to write"},
-                        "content": {"type": "string", "description": "Content to write to the file"}
-                    },
-                    "required": ["file_path", "content"]
-                }
-            },
-            {
-                "name": "create_directory",
-                "description": "Create a new directory",
-                "input_schema": {
-                    "type": "object", 
-                    "properties": {
-                        "dir_path": {"type": "string", "description": "Path to the directory to create"}
-                    },
-                    "required": ["dir_path"]
-                }
-            },
-            {
-                "name": "list_files",
-                "description": "List files in a directory",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "directory": {"type": "string", "description": "Directory to list", "default": "."},
-                        "pattern": {"type": "string", "description": "File pattern to match", "default": "*"}
-                    }
-                }
-            },
-            {
-                "name": "search_files",
-                "description": "Search for text in files",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string", "description": "Text to search for"},
-                        "file_pattern": {"type": "string", "description": "File pattern to search in", "default": "*.py"}
-                    },
-                    "required": ["query"]
-                }
-            },
-            {
-                "name": "run_command",
-                "description": "Execute a shell command",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "command": {"type": "string", "description": "Command to execute"},
-                        "cwd": {"type": "string", "description": "Working directory", "default": "."}
-                    },
-                    "required": ["command"]
-                }
-            },
-            {
-                "name": "git_status",
-                "description": "Get git repository status",
-                "input_schema": {"type": "object", "properties": {}}
-            },
-            {
-                "name": "git_commit",
-                "description": "Commit changes to git",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "message": {"type": "string", "description": "Commit message"},
-                        "files": {"type": "array", "items": {"type": "string"}, "description": "Files to commit"}
-                    },
-                    "required": ["message"]
-                }
-            },
-            {
-                "name": "analyze_code",
-                "description": "Analyze code for quality and issues",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {"type": "string", "description": "Path to code file to analyze"}
-                    },
-                    "required": ["file_path"]
-                }
-            },
-            {
-                "name": "generate_tests",
-                "description": "Generate unit tests for code",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {"type": "string", "description": "Path to code file to generate tests for"}
-                    },
-                    "required": ["file_path"]
-                }
-            }
-        ]
-    
-    async def _extract_and_queue_tasks(self, response: str, agent: str):
-        """Extract and queue follow-up tasks from response"""
-        # Simple task extraction based on keywords
-        task_keywords = [
-            "next step", "then we", "should also", "need to", "follow up",
-            "additionally", "after that", "once complete", "finally"
-        ]
-        
-        lines = response.split('\n')
-        tasks = []
-        
-        for line in lines:
-            line = line.strip()
-            if any(keyword in line.lower() for keyword in task_keywords):
-                if len(line) > 10 and not line.startswith('#'):
-                    tasks.append({
-                        "description": line,
-                        "agent": agent,
-                        "priority": 2
-                    })
-        
-        # Queue tasks
-        for task in tasks:
-            await self.task_queue.put(task)
+        self.logger.info(f"Registered {len(self.tools_registry)} tools")
     
     # Tool implementations
     async def _tool_read_file(self, file_path: str) -> str:
@@ -507,13 +151,13 @@
             if not full_path.exists():
                 return f"Error: File {file_path} not found"
             
-            async with aiofiles.open(full_path, 'r', encoding='utf-8') as f:
-                content = await f.read()
+            with open(full_path, 'r') as f:
+                content = f.read()
             
+            self.logger.debug(f"Read file: {file_path}")
             return content
-            
         except Exception as e:
-            return f"Error reading file {file_path}: {str(e)}"
+            return f"Error reading file: {str(e)}"
     
     async def _tool_write_file(self, file_path: str, content: str) -> str:
         """Write content to file"""
@@ -521,192 +165,324 @@
             full_path = self.project_root / file_path
             full_path.parent.mkdir(parents=True, exist_ok=True)
             
-            async with aiofiles.open(full_path, 'w', encoding='utf-8') as f:
-                await f.write(content)
+            with open(full_path, 'w') as f:
+                f.write(content)
             
-            return f"Successfully wrote {len(content)} characters to {file_path}"
-            
+            self.logger.debug(f"Wrote file: {file_path}")
+            return f"Successfully wrote to {file_path}"
         except Exception as e:
-            return f"Error writing file {file_path}: {str(e)}"
+            return f"Error writing file: {str(e)}"
     
-    async def _tool_create_directory(self, dir_path: str) -> str:
-        """Create directory"""
-        try:
-            full_path = self.project_root / dir_path
-            full_path.mkdir(parents=True, exist_ok=True)
-            return f"Successfully created directory: {dir_path}"
-            
-        except Exception as e:
-            return f"Error creating directory {dir_path}: {str(e)}"
-    
-    async def _tool_list_files(self, directory: str = ".", pattern: str = "*") -> Union[List[str], str]:
+    async def _tool_list_files(self, directory: str = ".", pattern: str = "*") -> str:
         """List files in directory"""
         try:
             dir_path = self.project_root / directory
             if not dir_path.exists():
-                return f"Error: Directory {directory} not found"
+                return f"Directory {directory} not found"
             
-            import glob
-            search_path = dir_path / pattern
-            files = glob.glob(str(search_path), recursive=True)
+            files = []
+            for item in dir_path.glob(pattern):
+                if item.is_file():
+                    files.append(str(item.relative_to(self.project_root)))
             
-            # Return relative paths
-            result = []
-            for file in files:
-                rel_path = Path(file).relative_to(self.project_root)
-                if Path(file).is_file():
-                    result.append(str(rel_path))
-            
-            return result
-            
+            return "\n".join(files) if files else "No files found"
         except Exception as e:
-            return f"Error listing files in {directory}: {str(e)}"
+            return f"Error listing files: {str(e)}"
     
-    async def _tool_search_files(self, query: str, file_pattern: str = "*.py") -> Union[List[Dict[str, Any]], str]:
-        """Search for text in files"""
+    async def _tool_create_directory(self, path: str) -> str:
+        """Create directory"""
         try:
-            import re
-            results = []
-            
-            files = await self._tool_list_files(".", f"**/{file_pattern}")
-            if isinstance(files, str):  # Error message
-                return files
-            
-            for file_path in files:
-                try:
-                    content = await self._tool_read_file(file_path)
-                    if isinstance(content, str) and not content.startswith("Error"):
-                        lines = content.split('\n')
-                        
-                        for line_num, line in enumerate(lines, 1):
-                            if re.search(query, line, re.IGNORECASE):
-                                results.append({
-                                    "file": file_path,
-                                    "line": line_num,
-                                    "content": line.strip(),
-                                    "match": query
-                                })
-                except:
-                    continue
-            
-            return results
-            
+            dir_path = self.project_root / path
+            dir_path.mkdir(parents=True, exist_ok=True)
+            return f"Created directory: {path}"
         except Exception as e:
-            return f"Error searching files: {str(e)}"
+            return f"Error creating directory: {str(e)}"
     
-    async def _tool_run_command(self, command: str, cwd: str = ".") -> Dict[str, Any]:
-        """Execute shell command"""
+    async def _tool_run_command(self, command: str, cwd: str = ".") -> str:
+        """Run shell command"""
         try:
             work_dir = self.project_root / cwd
             
-            process = await asyncio.create_subprocess_shell(
+            result = subprocess.run(
                 command,
+                shell=True,
                 cwd=work_dir,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
+                capture_output=True,
+                text=True,
+                timeout=self.config['tools']['timeout']
             )
             
-            stdout, stderr = await process.communicate()
+            output = f"Exit code: {result.returncode}\n"
+            if result.stdout:
+                output += f"Output:\n{result.stdout}\n"
+            if result.stderr:
+                output += f"Error:\n{result.stderr}"
             
-            result = {
-                "command": command,
-                "returncode": process.returncode,
-                "stdout": stdout.decode() if stdout else "",
-                "stderr": stderr.decode() if stderr else "",
-                "success": process.returncode == 0,
-                "cwd": str(work_dir)
+            return output
+        except subprocess.TimeoutExpired:
+            return "Error: Command timed out"
+        except Exception as e:
+            return f"Error running command: {str(e)}"
+    
+    async def _tool_search_files(self, query: str, file_pattern: str = "*.py") -> str:
+        """Search for text in files"""
+        try:
+            results = []
+            
+            for file_path in self.project_root.rglob(file_pattern):
+                if file_path.is_file():
+                    try:
+                        with open(file_path, 'r') as f:
+                            content = f.read()
+                            if query.lower() in content.lower():
+                                # Find line numbers
+                                lines = content.split('\n')
+                                for i, line in enumerate(lines, 1):
+                                    if query.lower() in line.lower():
+                                        results.append(
+                                            f"{file_path.relative_to(self.project_root)}:{i}: {line.strip()}"
+                                        )
+                    except Exception:
+                        continue
+            
+            return "\n".join(results) if results else f"No matches found for '{query}'"
+        except Exception as e:
+            return f"Error searching files: {str(e)}"
+    
+    async def _tool_analyze_code(self, file_path: str) -> str:
+        """Analyze code quality"""
+        try:
+            content = await self._tool_read_file(file_path)
+            if content.startswith("Error"):
+                return content
+            
+            # Basic analysis
+            lines = content.split('\n')
+            analysis = f"File: {file_path}\n"
+            analysis += f"Lines: {len(lines)}\n"
+            analysis += f"Size: {len(content)} bytes\n"
+            
+            # Count imports, functions, classes
+            imports = sum(1 for line in lines if line.strip().startswith(('import ', 'from ')))
+            functions = sum(1 for line in lines if line.strip().startswith('def '))
+            classes = sum(1 for line in lines if line.strip().startswith('class '))
+            
+            analysis += f"Imports: {imports}\n"
+            analysis += f"Functions: {functions}\n"
+            analysis += f"Classes: {classes}\n"
+            
+            return analysis
+        except Exception as e:
+            return f"Error analyzing code: {str(e)}"
+    
+    def get_tools_schema(self) -> List[Dict[str, Any]]:
+        """Get tools schema for Claude"""
+        return [
+            {
+                "name": "read_file",
+                "description": "Read the contents of a file",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the file to read"
+                        }
+                    },
+                    "required": ["file_path"]
+                }
+            },
+            {
+                "name": "write_file",
+                "description": "Write content to a file",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the file to write"
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Content to write to the file"
+                        }
+                    },
+                    "required": ["file_path", "content"]
+                }
+            },
+            {
+                "name": "list_files",
+                "description": "List files in a directory",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": "Directory to list files from",
+                            "default": "."
+                        },
+                        "pattern": {
+                            "type": "string",
+                            "description": "File pattern to match",
+                            "default": "*"
+                        }
+                    }
+                }
+            },
+            {
+                "name": "create_directory",
+                "description": "Create a directory",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Path of directory to create"
+                        }
+                    },
+                    "required": ["path"]
+                }
+            },
+            {
+                "name": "run_command",
+                "description": "Run a shell command",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "command": {
+                            "type": "string",
+                            "description": "Command to run"
+                        },
+                        "cwd": {
+                            "type": "string",
+                            "description": "Working directory",
+                            "default": "."
+                        }
+                    },
+                    "required": ["command"]
+                }
+            },
+            {
+                "name": "search_files",
+                "description": "Search for text in files",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "query": {
+                            "type": "string",
+                            "description": "Text to search for"
+                        },
+                        "file_pattern": {
+                            "type": "string",
+                            "description": "File pattern to search in",
+                            "default": "*.py"
+                        }
+                    },
+                    "required": ["query"]
+                }
+            },
+            {
+                "name": "analyze_code",
+                "description": "Analyze code file",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to code file to analyze"
+                        }
+                    },
+                    "required": ["file_path"]
+                }
             }
+        ]
+    
+    async def chat(self, message: str, use_tools: bool = True) -> str:
+        """Main chat interface"""
+        try:
+            self.logger.info(f"User: {message[:50]}...")
             
-            return result
+            # Build messages
+            messages = [{"role": "user", "content": message}]
+            
+            # System prompt
+            system_prompt = """You are THOR, an advanced AI development assistant with access to powerful tools.
+            You can read/write files, run commands, analyze code, and help with software development.
+            Be helpful, thorough, and always explain what you're doing."""
+            
+            # Get tools if enabled
+            tools = self.get_tools_schema() if use_tools else None
+            
+            # Call Claude
+            response = self.anthropic_client.messages.create(
+                model=self.config['anthropic']['model'],
+                max_tokens=self.config['anthropic']['max_tokens'],
+                system=system_prompt,
+                messages=messages,
+                tools=tools
+            )
+            
+            # Handle tool use
+            if hasattr(response.content[0], 'type') and response.content[0].type == 'tool_use':
+                tool_results = []
+                
+                for content in response.content:
+                    if hasattr(content, 'type') and content.type == 'tool_use':
+                        tool_name = content.name
+                        tool_args = content.input
+                        
+                        self.logger.info(f"Using tool: {tool_name}")
+                        
+                        if tool_name in self.tools_registry:
+                            result = await self.tools_registry[tool_name](**tool_args)
+                            tool_results.append({
+                                "tool_use_id": content.id,
+                                "content": result
+                            })
+                
+                # Continue conversation with results
+                messages.extend([
+                    {"role": "assistant", "content": response.content},
+                    {"role": "user", "content": tool_results}
+                ])
+                
+                final_response = self.anthropic_client.messages.create(
+                    model=self.config['anthropic']['model'],
+                    max_tokens=self.config['anthropic']['max_tokens'],
+                    system=system_prompt,
+                    messages=messages
+                )
+                
+                result_text = final_response.content[0].text
+            else:
+                result_text = response.content[0].text
+            
+            # Save to history
+            self._save_conversation(message, result_text)
+            
+            self.logger.info("Response generated successfully")
+            return result_text
             
         except Exception as e:
-            return {
-                "command": command,
-                "error": str(e),
-                "success": False
-            }
+            self.logger.error(f"Chat error: {e}")
+            return f"Error: {str(e)}"
     
-    async def _tool_git_status(self) -> Dict[str, Any]:
-        """Get git status"""
-        return await self._tool_run_command("git status --porcelain")
-    
-    async def _tool_git_diff(self, file_path: str = None) -> Dict[str, Any]:
-        """Get git diff"""
-        command = "git diff"
-        if file_path:
-            command += f" {file_path}"
-        return await self._tool_run_command(command)
-    
-    async def _tool_git_add(self, files: List[str] = None) -> Dict[str, Any]:
-        """Git add files"""
-        if files:
-            command = f"git add {' '.join(files)}"
-        else:
-            command = "git add ."
-        return await self._tool_run_command(command)
-    
-    async def _tool_git_commit(self, message: str, files: List[str] = None) -> Dict[str, Any]:
-        """Git commit"""
-        if files:
-            add_result = await self._tool_git_add(files)
-            if not add_result.get("success"):
-                return add_result
-        
-        return await self._tool_run_command(f'git commit -m "{message}"')
-    
-    async def _get_git_branch(self) -> str:
-        """Get current git branch"""
-        try:
-            result = await self._tool_run_command("git branch --show-current")
-            return result.get("stdout", "").strip()
-        except:
-            return "unknown"
-    
-    async def _get_git_remote(self) -> str:
-        """Get git remote URL"""
-        try:
-            result = await self._tool_run_command("git remote get-url origin")
-            return result.get("stdout", "").strip()
-        except:
-            return "none"
-    
-    def _save_conversation_messages(self, messages: List[ConversationMessage]):
-        """Save conversation messages to database"""
-        conn = sqlite3.connect(str(Path(self.project_root) / self.database_path))
+    def _save_conversation(self, user_msg: str, assistant_msg: str):
+        """Save conversation to database"""
+        conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         
-        for msg in messages:
-            cursor.execute('''
-                INSERT INTO conversations 
-                (id, session_id, role, content, agent, timestamp, tokens_used, metadata)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (
-                msg.id,
-                self.session_id,
-                msg.role,
-                msg.content,
-                msg.agent,
-                msg.timestamp,
-                msg.tokens_used,
-                json.dumps(msg.metadata or {})
-            ))
+        # Save user message
+        cursor.execute('''
+            INSERT INTO conversations (id, role, content, timestamp)
+            VALUES (?, ?, ?, ?)
+        ''', (str(uuid.uuid4()), 'user', user_msg, datetime.now()))
+        
+        # Save assistant message  
+        cursor.execute('''
+            INSERT INTO conversations (id, role, content, timestamp)
+            VALUES (?, ?, ?, ?)
+        ''', (str(uuid.uuid4()), 'assistant', assistant_msg, datetime.now()))
         
         conn.commit()
         conn.close()
-    
-    async def shutdown(self):
-        """Shutdown THOR client"""
-        self.console.print("[bold red]⚡ Shutting down THOR...[/bold red]")
-        
-        # Stop MCP servers
-        for name, process in self.mcp_servers.items():
-            self.logger.info(f"Stopping MCP server: {name}")
-            process.terminate()
-            try:
-                await asyncio.wait_for(process.wait(), timeout=5)
-            except asyncio.TimeoutError:
-                self.logger.warning(f"Force killing MCP server: {name}")
-                process.kill()
-        
-        self.mcp_servers.clear()
-        self.console.print("[green]✅ THOR shutdown complete[/green]")
