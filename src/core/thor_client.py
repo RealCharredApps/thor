@@ -181,11 +181,34 @@ class ThorClient:
                 return f"Directory {directory} not found"
             
             files = []
-            for item in dir_path.glob(pattern):
-                if item.is_file():
-                    files.append(str(item.relative_to(self.project_root)))
+            folders = []
             
-            return "\n".join(files) if files else "No files found"
+            # Get all items
+            for item in sorted(dir_path.glob(pattern)):
+                if item.is_file():
+                    size = item.stat().st_size
+                    files.append(f"📄 {item.name} ({size:,} bytes)")
+                elif item.is_dir() and not item.name.startswith('.'):
+                    folders.append(f"📁 {item.name}/")
+            
+            # Build result
+            result = f"Contents of {dir_path.absolute()}:\n\n"
+            
+            if folders:
+                result += "Folders:\n"
+                for folder in folders:
+                    result += f"  {folder}\n"
+                result += "\n"
+            
+            if files:
+                result += "Files:\n"
+                for file in files:
+                    result += f"  {file}\n"
+            
+            if not files and not folders:
+                result = "No files or folders found"
+            
+            return result
         except Exception as e:
             return f"Error listing files: {str(e)}"
     
@@ -398,74 +421,106 @@ class ThorClient:
         ]
     
     async def chat(self, message: str, use_tools: bool = True) -> str:
-        """Main chat interface"""
-        try:
-            self.logger.info(f"User: {message[:50]}...")
+    """Main chat interface"""
+    try:
+        self.logger.info(f"User: {message[:50]}...")
+        
+        # Build messages
+        messages = [{"role": "user", "content": message}]
+        
+        # System prompt
+        system_prompt = """You are THOR, an advanced AI development assistant with access to powerful tools.
+        You can read/write files, run commands, analyze code, and help with software development.
+        Be helpful, thorough, and always explain what you're doing.
+        
+        IMPORTANT: When asked to perform an action, USE THE TOOLS to actually do it, don't just describe what you would do."""
+        
+        # Get tools if enabled
+        tools = self.get_tools_schema() if use_tools else None
+        
+        # Call Claude
+        response = self.anthropic_client.messages.create(
+            model=self.config['anthropic']['model'],
+            max_tokens=self.config['anthropic']['max_tokens'],
+            system=system_prompt,
+            messages=messages,
+            tools=tools
+        )
+        
+        # Process response
+        result_text = ""
+        tool_results = []
+        
+        # Check if Claude wants to use tools
+        for content_block in response.content:
+            if content_block.type == "text":
+                result_text += content_block.text
+            elif content_block.type == "tool_use":
+                tool_name = content_block.name
+                tool_args = content_block.input
+                tool_id = content_block.id
+                
+                self.logger.info(f"Using tool: {tool_name} with args: {tool_args}")
+                
+                # Execute the tool
+                if tool_name in self.tools_registry:
+                    try:
+                        result = await self.tools_registry[tool_name](**tool_args)
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": str(result)
+                        })
+                    except Exception as e:
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": tool_id,
+                            "content": f"Error: {str(e)}",
+                            "is_error": True
+                        })
+                else:
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": f"Unknown tool: {tool_name}",
+                        "is_error": True
+                    })
+        
+        # If tools were used, get final response
+        if tool_results:
+            messages.append({"role": "assistant", "content": response.content})
+            messages.append({"role": "user", "content": tool_results})
             
-            # Build messages
-            messages = [{"role": "user", "content": message}]
-            
-            # System prompt
-            system_prompt = """You are THOR, an advanced AI development assistant with access to powerful tools.
-            You can read/write files, run commands, analyze code, and help with software development.
-            Be helpful, thorough, and always explain what you're doing."""
-            
-            # Get tools if enabled
-            tools = self.get_tools_schema() if use_tools else None
-            
-            # Call Claude
-            response = self.anthropic_client.messages.create(
+            final_response = self.anthropic_client.messages.create(
                 model=self.config['anthropic']['model'],
                 max_tokens=self.config['anthropic']['max_tokens'],
                 system=system_prompt,
-                messages=messages,
-                tools=tools
+                messages=messages
             )
             
-            # Handle tool use
-            if hasattr(response.content[0], 'type') and response.content[0].type == 'tool_use':
-                tool_results = []
-                
-                for content in response.content:
-                    if hasattr(content, 'type') and content.type == 'tool_use':
-                        tool_name = content.name
-                        tool_args = content.input
-                        
-                        self.logger.info(f"Using tool: {tool_name}")
-                        
-                        if tool_name in self.tools_registry:
-                            result = await self.tools_registry[tool_name](**tool_args)
-                            tool_results.append({
-                                "tool_use_id": content.id,
-                                "content": result
-                            })
-                
-                # Continue conversation with results
-                messages.extend([
-                    {"role": "assistant", "content": response.content},
-                    {"role": "user", "content": tool_results}
-                ])
-                
-                final_response = self.anthropic_client.messages.create(
-                    model=self.config['anthropic']['model'],
-                    max_tokens=self.config['anthropic']['max_tokens'],
-                    system=system_prompt,
-                    messages=messages
-                )
-                
-                result_text = final_response.content[0].text
-            else:
-                result_text = response.content[0].text
-            
-            # Save to history
-            self._save_conversation(message, result_text)
-            
-            self.logger.info("Response generated successfully")
-            return result_text
-            
-        except Exception as e:
-            self.logger.error(f"Chat error: {e}")
-            return f"Error: {str(e)}"
+            result_text = final_response.content[0].text
+        
+        # Save to history
+        self._save_conversation(message, result_text)
+        
+        self.logger.info("Response generated successfully")
+        return result_text
+        
+    except Exception as e:
+        self.logger.error(f"Chat error: {e}")
+        import traceback
+        self.logger.error(traceback.format_exc())
+        return f"Error: {str(e)}"
+    except Exception as e:
+        self.logger.error(f"Chat error: {e}")
+        import traceback
+        self.logger.error(traceback.format_exc())
+        return f"Error: {str(e)}"
+    except Exception as e:
+        self.logger.error(f"Chat error: {e}")
+        import traceback
+        self.logger.error(traceback.format_exc())
+        return f"Error: {str(e)}"
     
     def _save_conversation(self, user_msg: str, assistant_msg: str):
         """Save conversation to database"""
