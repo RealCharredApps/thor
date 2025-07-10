@@ -1,0 +1,30 @@
+{
+  "name": "thor-mcp-client",
+  "version": "1.0.0",
+  "description": "Advanced MCP Client for Autonomous Software Development",
+  "main": "index.js",
+  "scripts": {
+    "install-mcp": "npm install -g @modelcontextprotocol/server-filesystem @modelcontextprotocol/server-git",
+    "setup": "python scripts/setup.py",
+    "test": "python -m pytest tests/",
+    "start": "python src/thor_main.py"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/server-filesystem": "latest",
+    "@modelcontextprotocol/server-git": "latest",
+    "@modelcontextprotocol/server-sqlite": "latest"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": [
+    "mcp",
+    "ai",
+    "development",
+    "anthropic",
+    "claude",
+    "autonomous"
+  ],
+  "author": "THOR Development Team",
+  "license": "MIT"
+}

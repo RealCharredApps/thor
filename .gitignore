@@ -1,0 +1,90 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+.env
+*.env
+.env.*
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# THOR specific
+thor.db
+thor.log
+*.backup.*
+config/config.yml
+logs/
+data/
+backup/
+temp/
+.thor_history
+
+# API Config
+config/config.example.yml
+config/config.yml
+config/config.yaml
+set_api_key.sh
+passwords.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node modules
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# API keys and secrets
+.env.local
+.env.production
+*.pem
+*.key
