@@ -1,0 +1,179 @@
+# thor/config/thor_config.yaml
+# THOR Configuration File
+
+# API Configuration
+anthropic_api_key: "${ANTHROPIC_API_KEY}"
+default_model: "claude-3-5-sonnet-20241022"
+max_tokens: 4096
+temperature: 0.7
+
+# Memory Configuration
+conversation_memory_limit: 50
+auto_save_conversations: true
+memory_dir: "thor/memory"
+artifacts_dir: "thor/artifacts"
+
+# Swarm Configuration
+enable_swarm: true
+swarm_timeout: 300
+max_agents: 10
+argus_path: "./Argus_Ai_Agent_MCPs/"
+
+# Performance Configuration
+parallel_sessions: true
+max_parallel_tasks: 5
+kill_switch_enabled: true
+
+# Logging Configuration
+log_level: "INFO"
+log_file: "thor/logs/thor.log"
+
+# Security Configuration
+api_rate_limit: 100
+max_file_size: 10485760  # 10MB in bytes
+allowed_extensions:
+  - ".py"
+  - ".js"
+  - ".ts"
+  - ".java"
+  - ".cpp"
+  - ".c"
+  - ".cs"
+  - ".go"
+  - ".rs"
+  - ".php"
+  - ".rb"
+  - ".swift"
+  - ".kt"
+  - ".scala"
+  - ".sh"
+  - ".bash"
+  - ".zsh"
+  - ".fish"
+  - ".html"
+  - ".css"
+  - ".scss"
+  - ".sass"
+  - ".less"
+  - ".xml"
+  - ".json"
+  - ".yaml"
+  - ".yml"
+  - ".toml"
+  - ".ini"
+  - ".cfg"
+  - ".conf"
+  - ".env"
+  - ".md"
+  - ".txt"
+  - ".rst"
+  - ".tex"
+  - ".sql"
+  - ".r"
+  - ".m"
+  - ".pl"
+  - ".lua"
+  - ".dart"
+  - ".elm"
+  - ".clj"
+  - ".hs"
+  - ".ml"
+  - ".fs"
+  - ".vb"
+  - ".pas"
+  - ".asm"
+  - ".s"
+  - ".dockerfile"
+
+# UI Configuration
+ui_theme: "dark"
+show_typing_indicators: true
+auto_complete: true
+
+# Budget Configuration
+monthly_budget: 5.0  # USD
+cost_alert_threshold: 0.8  # 80% of budget
+
+# Session Configuration
+session_timeout: 3600  # 1 hour in seconds
+
+# Model Selection Rules
+model_selection:
+  simple_tasks:
+    - "claude-3-haiku-20240307"
+    - "simple_query"
+    - "quick_answer"
+    - "basic_task"
+  
+  standard_tasks:
+    - "claude-3-5-sonnet-20241022"
+    - "coding"
+    - "debugging"
+    - "implementation"
+    - "quick_fix"
+    - "general"
+  
+  complex_tasks:
+    - "claude-3-opus-20240229"
+    - "architecture"
+    - "security_audit"
+    - "complex_analysis"
+    - "research"
+
+# Agent Capabilities
+agent_capabilities:
+  business:
+    - "market_analysis"
+    - "strategy"
+    - "planning"
+    - "financial_modeling"
+    - "competitor_analysis"
+    - "business_planning"
+  
+  legal:
+    - "contract_review"
+    - "compliance"
+    - "risk_assessment"
+    - "legal_research"
+    - "regulatory_analysis"
+    - "policy_review"
+  
+  science:
+    - "research"
+    - "data_analysis"
+    - "hypothesis_testing"
+    - "technical_writing"
+    - "literature_review"
+    - "experimental_design"
+  
+  healthcare:
+    - "medical_research"
+    - "diagnosis_support"
+    - "treatment_planning"
+    - "health_analytics"
+    - "clinical_analysis"
+    - "patient_data_analysis"
+  
+  financial:
+    - "financial_analysis"
+    - "investment_advice"
+    - "risk_management"
+    - "accounting"
+    - "portfolio_analysis"
+    - "market_research"
+  
+  technical:
+    - "software_development"
+    - "system_design"
+    - "debugging"
+    - "code_review"
+    - "architecture_design"
+    - "performance_optimization"
+  
+  creative:
+    - "content_creation"
+    - "design"
+    - "brainstorming"
+    - "storytelling"
+    - "copywriting"
+    - "creative_writing"

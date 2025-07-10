@@ -1,142 +1,79 @@
-# src/core/thor_client.py
+# thor/src/core/thor_client.py
 import os
-import asyncio
 import json
+import asyncio
 import logging
-import subprocess
+from typing import Dict, List, Optional, Any
 from datetime import datetime
+from dataclasses import dataclass, asdict
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Callable
+import threading
+from concurrent.futures import ThreadPoolExecutor
 import anthropic
-from dataclasses import dataclass
-import sqlite3
-import uuid
-from dotenv import load_dotenv
+import subprocess
+import re
+import ast
+import yaml
+from .swarm_manager import SwarmManager
+from ..agents.argus_orchestrator import ArgusOrchestrator
+from ..utils.model_selector import ModelSelector
+from ..utils.conversation_memory import ConversationMemory
+from ..utils.artifact_manager import ArtifactManager
 
-# Load .env file
-load_dotenv()
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('thor/logs/thor.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 @dataclass
-class Message:
-    role: str
-    content: str
-    timestamp: datetime
-    metadata: Dict[str, Any] = None
-
+class ThorConfig:
+    """Configuration for THOR client"""
+    anthropic_api_key: str
+    default_model: str = "claude-3-5-sonnet-20241022"
+    max_tokens: int = 4096
+    temperature: float = 0.7
+    conversation_memory_limit: int = 50
+    enable_swarm: bool = True
+    swarm_timeout: int = 300
+    auto_save_conversations: bool = True
+    kill_switch_enabled: bool = True
+    parallel_sessions: bool = True
+    session_id: Optional[str] = None
+    
 class ThorClient:
-    """THOR AI Development Framework - Core Client"""
+    """Advanced AI Development Assistant with Swarm Capabilities"""
     
-    def __init__(self, config_path: str = None):
-        self.config = self._load_config(config_path)
-        self.anthropic_client = None
-        self.conversation_history = []
-        self.tools_registry = {}
-        self.logger = self._setup_logging()
-        self.db_path = Path.home() / '.thor' / 'thor.db'
-        self.project_root = Path.cwd()
+    def __init__(self, config: ThorConfig):
+        self.config = config
+        self.anthropic_client = anthropic.Anthropic(api_key=config.anthropic_api_key)
+        self.session_id = config.session_id or self._generate_session_id()
+        self.kill_switch = threading.Event()
+        self.is_running = False
         
-        # Initialize components
-        self._init_database()
-        self._init_anthropic()
-        self._register_tools()
-        
-    def _load_config(self, config_path: str = None) -> Dict[str, Any]:
-        """Load configuration from file or environment"""
-        if config_path and Path(config_path).exists():
-            import yaml
-            with open(config_path, 'r') as f:
-                return yaml.safe_load(f)
-        
-        # Default configuration
-        return {
-            'anthropic': {
-                'api_key': os.getenv('ANTHROPIC_API_KEY'),
-                'model': 'claude-3-5-sonnet-20241022',
-                'max_tokens': 4000
-            },
-            'tools': {
-                'enabled': True,
-                'timeout': 30
-            },
-            'logging': {
-                'level': 'INFO',
-                'file': 'thor.log'
-            }
-        }
-    
-    def _setup_logging(self) -> logging.Logger:
-        """Setup logging configuration"""
-        logger = logging.getLogger('THOR')
-        logger.setLevel(getattr(logging, self.config['logging']['level']))
-        
-        # Console handler
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        
-        # File handler
-        log_dir = Path.home() / '.thor' / 'logs'
-        log_dir.mkdir(parents=True, exist_ok=True)
-        fh = logging.FileHandler(log_dir / self.config['logging']['file'])
-        fh.setLevel(logging.DEBUG)
-        
-        # Formatter
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        # Initialize managers
+        self.model_selector = ModelSelector()
+        self.conversation_memory = ConversationMemory(
+            session_id=self.session_id,
+            limit=config.conversation_memory_limit
         )
-        ch.setFormatter(formatter)
-        fh.setFormatter(formatter)
+        self.artifact_manager = ArtifactManager()
         
-        logger.addHandler(ch)
-        logger.addHandler(fh)
-        
-        return logger
-    
-    def _init_database(self):
-        """Initialize SQLite database"""
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        # Conversations table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS conversations (
-                id TEXT PRIMARY KEY,
-                role TEXT NOT NULL,
-                content TEXT NOT NULL,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-                metadata TEXT
-            )
-        ''')
-        
-        # Tools usage table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS tool_usage (
-                id TEXT PRIMARY KEY,
-                tool_name TEXT NOT NULL,
-                arguments TEXT,
-                result TEXT,
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-        
-        conn.commit()
-        conn.close()
-        
-        self.logger.info("Database initialized")
-    
-    def _init_anthropic(self):
-        """Initialize Anthropic client"""
-        api_key = self.config['anthropic']['api_key']
-        if not api_key:
-            raise ValueError("ANTHROPIC_API_KEY not found. Set it in environment or config.")
-        
-        self.anthropic_client = anthropic.Anthropic(api_key=api_key)
-        self.logger.info("Anthropic client initialized")
-    
-    def _register_tools(self):
-        """Register available tools"""
-        self.tools_registry = {
+        # Initialize swarm components
+        if config.enable_swarm:
+            self.swarm_manager = SwarmManager()
+            self.argus_orchestrator = ArgusOrchestrator()
+        else:
+            self.swarm_manager = None
+            self.argus_orchestrator = None
+            
+        # Tool registry
+        self.tools = {
             'read_file': self._tool_read_file,
             'write_file': self._tool_write_file,
             'list_files': self._tool_list_files,
@@ -144,179 +81,213 @@ class ThorClient:
             'run_command': self._tool_run_command,
             'search_files': self._tool_search_files,
             'analyze_code': self._tool_analyze_code,
+            'orchestrate_swarm': self._tool_orchestrate_swarm,
+            'deploy_agent': self._tool_deploy_agent,
+            'get_swarm_status': self._tool_get_swarm_status,
+            'manage_conversation': self._tool_manage_conversation,
+            'create_artifact': self._tool_create_artifact,
+            'get_artifact': self._tool_get_artifact,
+            'kill_switch': self._tool_kill_switch,
+            'parallel_execute': self._tool_parallel_execute,
         }
-        self.logger.info(f"Registered {len(self.tools_registry)} tools")
+        
+        # System prompts
+        self.system_prompt = self._build_system_prompt()
+        
+        logger.info(f"THOR Client initialized with session: {self.session_id}")
+        
+    def _generate_session_id(self) -> str:
+        """Generate unique session ID"""
+        return f"thor_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{os.getpid()}"
     
-    # Tool implementations
-    async def _tool_read_file(self, file_path: str) -> str:
-        """Read file contents"""
-        try:
-            full_path = self.project_root / file_path
-            if not full_path.exists():
-                return f"Error: File {file_path} not found"
-            
-            with open(full_path, 'r') as f:
-                content = f.read()
-            
-            self.logger.debug(f"Read file: {file_path}")
-            return content
-        except Exception as e:
-            return f"Error reading file: {str(e)}"
+    def _build_system_prompt(self) -> str:
+        """Build comprehensive system prompt"""
+        prompt = """You are THOR, an advanced AI development assistant with access to powerful tools and swarm capabilities.
+
+Core Capabilities:
+- File system operations (read/write/create/analyze)
+- Command execution with error handling
+- Code analysis and best practices enforcement
+- Swarm orchestration for complex tasks
+- Multi-agent coordination via Argus system
+- Conversation and artifact memory management
+- Parallel task execution
+- Kill switch for emergency stops
+
+Tool Usage Guidelines:
+1. Always USE TOOLS to perform actions, don't just describe
+2. Check for kill switch before long operations
+3. Use appropriate model for task complexity
+4. Maintain conversation context and artifacts
+5. Follow security best practices
+6. Provide detailed explanations of actions
+
+Swarm Integration:
+- Use orchestrate_swarm for complex multi-domain tasks
+- Deploy specialized agents for specific domains (legal, business, science, etc.)
+- Coordinate parallel execution when beneficial
+- Monitor swarm status and handle failures gracefully
+
+Model Selection Strategy:
+- Quick fixes, coding, debugging: Sonnet-4
+- Architecture, security audits, complex analysis: Opus-4
+- Default to Sonnet-4 for efficiency
+
+Security & Best Practices:
+- Never expose API keys or secrets
+- Validate all inputs and outputs
+- Use proper error handling
+- Log all significant operations
+- Respect rate limits and costs
+
+Be thorough, efficient, and always explain your reasoning."""
+        
+        return prompt
     
-    async def _tool_write_file(self, file_path: str, content: str) -> str:
-        """Write content to file"""
+    async def process_message(self, message: str, task_type: str = "general") -> Dict[str, Any]:
+        """Process user message with intelligent routing"""
+        if self.kill_switch.is_set():
+            return {"error": "Kill switch activated", "status": "stopped"}
+            
+        self.is_running = True
+        start_time = datetime.now()
+        
         try:
-            full_path = self.project_root / file_path
-            full_path.parent.mkdir(parents=True, exist_ok=True)
+            # Select appropriate model
+            model = self.model_selector.choose_model(task_type)
+            logger.info(f"Selected model: {model} for task: {task_type}")
             
-            with open(full_path, 'w') as f:
-                f.write(content)
+            # Store conversation
+            self.conversation_memory.add_message("user", message)
             
-            self.logger.debug(f"Wrote file: {file_path}")
-            return f"Successfully wrote to {file_path}"
-        except Exception as e:
-            return f"Error writing file: {str(e)}"
-    
-    async def _tool_list_files(self, directory: str = ".", pattern: str = "*") -> str:
-        """List files in directory"""
-        try:
-            dir_path = self.project_root / directory
-            if not dir_path.exists():
-                return f"Directory {directory} not found"
+            # Get conversation context
+            context = self.conversation_memory.get_context()
             
-            files = []
-            folders = []
+            # Prepare messages for API
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                *context,
+                {"role": "user", "content": message}
+            ]
             
-            # Get all items
-            for item in sorted(dir_path.glob(pattern)):
-                if item.is_file():
-                    size = item.stat().st_size
-                    files.append(f"📄 {item.name} ({size:,} bytes)")
-                elif item.is_dir() and not item.name.startswith('.'):
-                    folders.append(f"📁 {item.name}/")
+            # Process with selected model
+            response = await self._process_with_model(messages, model)
             
-            # Build result
-            result = f"Contents of {dir_path.absolute()}:\n\n"
+            # Store response
+            self.conversation_memory.add_message("assistant", response.get("content", ""))
             
-            if folders:
-                result += "Folders:\n"
-                for folder in folders:
-                    result += f"  {folder}\n"
-                result += "\n"
+            # Calculate usage
+            processing_time = (datetime.now() - start_time).total_seconds()
             
-            if files:
-                result += "Files:\n"
-                for file in files:
-                    result += f"  {file}\n"
+            result = {
+                "response": response,
+                "model_used": model,
+                "processing_time": processing_time,
+                "session_id": self.session_id,
+                "status": "completed"
+            }
             
-            if not files and not folders:
-                result = "No files or folders found"
-            
+            # Auto-save if enabled
+            if self.config.auto_save_conversations:
+                self.conversation_memory.save_to_file()
+                
             return result
-        except Exception as e:
-            return f"Error listing files: {str(e)}"
-    
-    async def _tool_create_directory(self, path: str) -> str:
-        """Create directory"""
-        try:
-            dir_path = self.project_root / path
-            dir_path.mkdir(parents=True, exist_ok=True)
-            return f"Created directory: {path}"
-        except Exception as e:
-            return f"Error creating directory: {str(e)}"
-    
-    async def _tool_run_command(self, command: str, cwd: str = ".") -> str:
-        """Run shell command"""
-        try:
-            work_dir = self.project_root / cwd
             
-            result = subprocess.run(
-                command,
-                shell=True,
-                cwd=work_dir,
-                capture_output=True,
-                text=True,
-                timeout=self.config['tools']['timeout']
+        except Exception as e:
+            logger.error(f"Error processing message: {str(e)}")
+            return {
+                "error": str(e),
+                "status": "error",
+                "session_id": self.session_id
+            }
+        finally:
+            self.is_running = False
+    
+    async def _process_with_model(self, messages: List[Dict], model: str) -> Dict[str, Any]:
+        """Process messages with specified model"""
+        try:
+            # Check for kill switch before API call
+            if self.kill_switch.is_set():
+                return {"error": "Kill switch activated", "content": ""}
+            
+            response = await asyncio.get_event_loop().run_in_executor(
+                None,
+                lambda: self.anthropic_client.messages.create(
+                    model=model,
+                    max_tokens=self.config.max_tokens,
+                    temperature=self.config.temperature,
+                    messages=messages,
+                    tools=self._get_tool_definitions()
+                )
             )
             
-            output = f"Exit code: {result.returncode}\n"
-            if result.stdout:
-                output += f"Output:\n{result.stdout}\n"
-            if result.stderr:
-                output += f"Error:\n{result.stderr}"
+            # Handle tool calls
+            if response.stop_reason == "tool_use":
+                return await self._handle_tool_calls(response)
             
-            return output
-        except subprocess.TimeoutExpired:
-            return "Error: Command timed out"
+            return {
+                "content": response.content[0].text if response.content else "",
+                "usage": response.usage.__dict__ if hasattr(response, 'usage') else {},
+                "stop_reason": response.stop_reason
+            }
+            
         except Exception as e:
-            return f"Error running command: {str(e)}"
+            logger.error(f"Model processing error: {str(e)}")
+            raise
     
-    async def _tool_search_files(self, query: str, file_pattern: str = "*.py") -> str:
-        """Search for text in files"""
-        try:
-            results = []
-            
-            for file_path in self.project_root.rglob(file_pattern):
-                if file_path.is_file():
+    async def _handle_tool_calls(self, response) -> Dict[str, Any]:
+        """Handle tool calls from model response"""
+        results = []
+        
+        for content_block in response.content:
+            if content_block.type == "tool_use":
+                tool_name = content_block.name
+                tool_input = content_block.input
+                
+                # Check kill switch before tool execution
+                if self.kill_switch.is_set():
+                    return {"error": "Kill switch activated during tool execution", "content": ""}
+                
+                if tool_name in self.tools:
                     try:
-                        with open(file_path, 'r') as f:
-                            content = f.read()
-                            if query.lower() in content.lower():
-                                # Find line numbers
-                                lines = content.split('\n')
-                                for i, line in enumerate(lines, 1):
-                                    if query.lower() in line.lower():
-                                        results.append(
-                                            f"{file_path.relative_to(self.project_root)}:{i}: {line.strip()}"
-                                        )
-                    except Exception:
-                        continue
-            
-            return "\n".join(results) if results else f"No matches found for '{query}'"
-        except Exception as e:
-            return f"Error searching files: {str(e)}"
+                        result = await self.tools[tool_name](tool_input)
+                        results.append({
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "output": result
+                        })
+                    except Exception as e:
+                        logger.error(f"Tool execution error: {tool_name} - {str(e)}")
+                        results.append({
+                            "tool": tool_name,
+                            "input": tool_input,
+                            "error": str(e)
+                        })
+                else:
+                    results.append({
+                        "tool": tool_name,
+                        "input": tool_input,
+                        "error": f"Unknown tool: {tool_name}"
+                    })
+        
+        return {
+            "content": "Tool execution completed",
+            "tool_results": results,
+            "stop_reason": "tool_use"
+        }
     
-    async def _tool_analyze_code(self, file_path: str) -> str:
-        """Analyze code quality"""
-        try:
-            content = await self._tool_read_file(file_path)
-            if content.startswith("Error"):
-                return content
-            
-            # Basic analysis
-            lines = content.split('\n')
-            analysis = f"File: {file_path}\n"
-            analysis += f"Lines: {len(lines)}\n"
-            analysis += f"Size: {len(content)} bytes\n"
-            
-            # Count imports, functions, classes
-            imports = sum(1 for line in lines if line.strip().startswith(('import ', 'from ')))
-            functions = sum(1 for line in lines if line.strip().startswith('def '))
-            classes = sum(1 for line in lines if line.strip().startswith('class '))
-            
-            analysis += f"Imports: {imports}\n"
-            analysis += f"Functions: {functions}\n"
-            analysis += f"Classes: {classes}\n"
-            
-            return analysis
-        except Exception as e:
-            return f"Error analyzing code: {str(e)}"
-    
-    def get_tools_schema(self) -> List[Dict[str, Any]]:
-        """Get tools schema for Claude"""
+    def _get_tool_definitions(self) -> List[Dict]:
+        """Get tool definitions for API"""
         return [
             {
                 "name": "read_file",
-                "description": "Read the contents of a file",
+                "description": "Read content from a file",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "Path to the file to read"
-                        }
+                        "path": {"type": "string", "description": "Path to file"}
                     },
-                    "required": ["file_path"]
+                    "required": ["path"]
                 }
             },
             {
@@ -325,210 +296,386 @@ class ThorClient:
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "Path to the file to write"
-                        },
-                        "content": {
-                            "type": "string",
-                            "description": "Content to write to the file"
-                        }
+                        "path": {"type": "string", "description": "Path to file"},
+                        "content": {"type": "string", "description": "Content to write"}
                     },
-                    "required": ["file_path", "content"]
+                    "required": ["path", "content"]
                 }
             },
             {
-                "name": "list_files",
-                "description": "List files in a directory",
+                "name": "orchestrate_swarm",
+                "description": "Orchestrate multiple AI agents for complex tasks",
                 "input_schema": {
                     "type": "object",
                     "properties": {
-                        "directory": {
-                            "type": "string",
-                            "description": "Directory to list files from",
-                            "default": "."
-                        },
-                        "pattern": {
-                            "type": "string",
-                            "description": "File pattern to match",
-                            "default": "*"
-                        }
+                        "task": {"type": "string", "description": "Task description"},
+                        "agents": {"type": "array", "items": {"type": "string"}, "description": "Agent types to use"},
+                        "coordination_mode": {"type": "string", "enum": ["sequential", "parallel", "hierarchical"], "default": "sequential"}
+                    },
+                    "required": ["task", "agents"]
+                }
+            },
+            {
+                "name": "kill_switch",
+                "description": "Emergency stop for all operations",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "reason": {"type": "string", "description": "Reason for emergency stop"}
                     }
                 }
-            },
-            {
-                "name": "create_directory",
-                "description": "Create a directory",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "path": {
-                            "type": "string",
-                            "description": "Path of directory to create"
-                        }
-                    },
-                    "required": ["path"]
-                }
-            },
-            {
-                "name": "run_command",
-                "description": "Run a shell command",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "command": {
-                            "type": "string",
-                            "description": "Command to run"
-                        },
-                        "cwd": {
-                            "type": "string",
-                            "description": "Working directory",
-                            "default": "."
-                        }
-                    },
-                    "required": ["command"]
-                }
-            },
-            {
-                "name": "search_files",
-                "description": "Search for text in files",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "query": {
-                            "type": "string",
-                            "description": "Text to search for"
-                        },
-                        "file_pattern": {
-                            "type": "string",
-                            "description": "File pattern to search in",
-                            "default": "*.py"
-                        }
-                    },
-                    "required": ["query"]
-                }
-            },
-            {
-                "name": "analyze_code",
-                "description": "Analyze code file",
-                "input_schema": {
-                    "type": "object",
-                    "properties": {
-                        "file_path": {
-                            "type": "string",
-                            "description": "Path to code file to analyze"
-                        }
-                    },
-                    "required": ["file_path"]
-                }
             }
+            # Add more tool definitions...
         ]
     
-    async def chat(self, message: str, use_tools: bool = True) -> str:
-        """Main chat interface"""
+    # Tool implementations
+    async def _tool_read_file(self, params: Dict) -> Dict[str, Any]:
+        """Read file tool"""
         try:
-            self.logger.info(f"User: {message[:50]}...")
+            path = params.get("path", "")
+            if not path:
+                return {"error": "Path parameter required"}
             
-            # Build messages
-            messages = [{"role": "user", "content": message}]
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
             
-            # System prompt
-            system_prompt = """You are THOR, an advanced AI development assistant with access to powerful tools.
-            You can read/write files, run commands, analyze code, and help with software development.
-            Be helpful, thorough, and always explain what you're doing.
+            return {
+                "success": True,
+                "content": content,
+                "path": path,
+                "size": len(content)
+            }
+        except Exception as e:
+            return {"error": str(e), "path": path}
+    
+    async def _tool_write_file(self, params: Dict) -> Dict[str, Any]:
+        """Write file tool"""
+        try:
+            path = params.get("path", "")
+            content = params.get("content", "")
             
-            IMPORTANT: When asked to perform an action, USE THE TOOLS to actually do it, don't just describe what you would do."""
+            if not path:
+                return {"error": "Path parameter required"}
             
-            # Get tools if enabled
-            tools = self.get_tools_schema() if use_tools else None
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(path), exist_ok=True)
             
-            # Call Claude
-            response = self.anthropic_client.messages.create(
-                model=self.config['anthropic']['model'],
-                max_tokens=self.config['anthropic']['max_tokens'],
-                system=system_prompt,
-                messages=messages,
-                tools=tools
+            with open(path, 'w', encoding='utf-8') as f:
+                f.write(content)
+            
+            return {
+                "success": True,
+                "path": path,
+                "bytes_written": len(content.encode('utf-8'))
+            }
+        except Exception as e:
+            return {"error": str(e), "path": path}
+    
+    async def _tool_orchestrate_swarm(self, params: Dict) -> Dict[str, Any]:
+        """Orchestrate swarm tool"""
+        if not self.swarm_manager:
+            return {"error": "Swarm not enabled"}
+        
+        try:
+            task = params.get("task", "")
+            agents = params.get("agents", [])
+            coordination_mode = params.get("coordination_mode", "sequential")
+            
+            if not task or not agents:
+                return {"error": "Task and agents parameters required"}
+            
+            result = await self.swarm_manager.orchestrate_task(
+                task=task,
+                agents=agents,
+                mode=coordination_mode
             )
             
-            # Process response
-            result_text = ""
-            tool_results = []
-            
-            # Check if Claude wants to use tools
-            for content_block in response.content:
-                if content_block.type == "text":
-                    result_text += content_block.text
-                elif content_block.type == "tool_use":
-                    tool_name = content_block.name
-                    tool_args = content_block.input
-                    tool_id = content_block.id
-                    
-                    self.logger.info(f"Using tool: {tool_name} with args: {tool_args}")
-                    
-                    # Execute the tool
-                    if tool_name in self.tools_registry:
-                        try:
-                            result = await self.tools_registry[tool_name](**tool_args)
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": tool_id,
-                                "content": str(result)
-                            })
-                        except Exception as e:
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": tool_id,
-                                "content": f"Error: {str(e)}",
-                                "is_error": True
-                            })
-                    else:
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": tool_id,
-                            "content": f"Unknown tool: {tool_name}",
-                            "is_error": True
-                        })
-            
-            # If tools were used, get final response
-            if tool_results:
-                messages.append({"role": "assistant", "content": response.content})
-                messages.append({"role": "user", "content": tool_results})
-                
-                final_response = self.anthropic_client.messages.create(
-                    model=self.config['anthropic']['model'],
-                    max_tokens=self.config['anthropic']['max_tokens'],
-                    system=system_prompt,
-                    messages=messages
-                )
-                
-                result_text = final_response.content[0].text
-            
-            # Save to history
-            def _save_conversation(self, user_msg: str, assistant_msg: str):
-                """Save conversation to database"""
-                try:
-                    conn = sqlite3.connect(self.db_path)
-                    cursor = conn.cursor()
-                    
-                    # Save messages
-                    for role, content in [("user", user_msg), ("assistant", assistant_msg)]:
-                        cursor.execute('''
-                            INSERT INTO conversations (id, role, content, timestamp)
-                            VALUES (?, ?, ?, ?)
-                        ''', (str(uuid.uuid4()), role, content, datetime.now()))
-                    
-                    conn.commit()
-                    conn.close()
-                except Exception as e:
-                    self.logger.error(f"Error saving conversation: {e}")
-
-            # Actually save the conversation
-            _save_conversation(self, message, result_text)
-            return result_text
-
+            return {
+                "success": True,
+                "task": task,
+                "agents": agents,
+                "result": result
+            }
         except Exception as e:
-            self.logger.error(f"Error in chat: {e}")
-            return f"Error: {str(e)}"
-
+            return {"error": str(e)}
+    
+    async def _tool_kill_switch(self, params: Dict) -> Dict[str, Any]:
+        """Kill switch tool"""
+        reason = params.get("reason", "Emergency stop requested")
+        self.kill_switch.set()
+        logger.warning(f"Kill switch activated: {reason}")
+        
+        return {
+            "success": True,
+            "reason": reason,
+            "message": "All operations stopped"
+        }
+    
+    def reset_kill_switch(self):
+        """Reset kill switch"""
+        self.kill_switch.clear()
+        logger.info("Kill switch reset")
+    
+    async def _tool_parallel_execute(self, params: Dict) -> Dict[str, Any]:
+        """Execute multiple tasks in parallel"""
+        tasks = params.get("tasks", [])
+        max_workers = params.get("max_workers", 3)
+        
+        if not tasks:
+            return {"error": "No tasks provided"}
+        
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = []
+                for task in tasks:
+                    future = executor.submit(self._execute_single_task, task)
+                    futures.append(future)
+                
+                results = []
+                for future in futures:
+                    if self.kill_switch.is_set():
+                        break
+                    result = future.result()
+                    results.append(result)
+                
+                return {
+                    "success": True,
+                    "results": results,
+                    "completed": len(results)
+                }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    def _execute_single_task(self, task: Dict) -> Dict[str, Any]:
+        """Execute a single task"""
+        # Implementation for single task execution
+        pass
+    
+    # Additional tool implementations...
+    async def _tool_list_files(self, params: Dict) -> Dict[str, Any]:
+        """List files tool"""
+        try:
+            path = params.get("path", ".")
+            pattern = params.get("pattern", "*")
+            
+            files = []
+            for file_path in Path(path).glob(pattern):
+                files.append({
+                    "name": file_path.name,
+                    "path": str(file_path),
+                    "is_dir": file_path.is_dir(),
+                    "size": file_path.stat().st_size if file_path.is_file() else 0
+                })
+            
+            return {
+                "success": True,
+                "files": files,
+                "count": len(files)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_create_directory(self, params: Dict) -> Dict[str, Any]:
+        """Create directory tool"""
+        try:
+            path = params.get("path", "")
+            if not path:
+                return {"error": "Path parameter required"}
+            
+            os.makedirs(path, exist_ok=True)
+            return {
+                "success": True,
+                "path": path,
+                "created": True
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_run_command(self, params: Dict) -> Dict[str, Any]:
+        """Run command tool"""
+        try:
+            command = params.get("command", "")
+            if not command:
+                return {"error": "Command parameter required"}
+            
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            return {
+                "success": True,
+                "command": command,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "return_code": result.returncode
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_search_files(self, params: Dict) -> Dict[str, Any]:
+        """Search files tool"""
+        try:
+            path = params.get("path", ".")
+            pattern = params.get("pattern", "")
+            content_search = params.get("content_search", "")
+            
+            results = []
+            for file_path in Path(path).rglob("*"):
+                if file_path.is_file():
+                    if pattern and pattern not in file_path.name:
+                        continue
+                    
+                    if content_search:
+                        try:
+                            with open(file_path, 'r', encoding='utf-8') as f:
+                                content = f.read()
+                                if content_search in content:
+                                    results.append({
+                                        "path": str(file_path),
+                                        "matches": content.count(content_search)
+                                    })
+                        except:
+                            continue
+                    else:
+                        results.append({"path": str(file_path)})
+            
+            return {
+                "success": True,
+                "results": results,
+                "count": len(results)
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_analyze_code(self, params: Dict) -> Dict[str, Any]:
+        """Analyze code tool"""
+        try:
+            path = params.get("path", "")
+            if not path:
+                return {"error": "Path parameter required"}
+            
+            with open(path, 'r', encoding='utf-8') as f:
+                code = f.read()
+            
+            # Basic code analysis
+            analysis = {
+                "lines": len(code.splitlines()),
+                "characters": len(code),
+                "functions": len(re.findall(r'def\s+\w+', code)),
+                "classes": len(re.findall(r'class\s+\w+', code)),
+                "imports": len(re.findall(r'^import\s+|^from\s+', code, re.MULTILINE)),
+                "comments": len(re.findall(r'#.*|""".*?"""', code, re.DOTALL)),
+                "complexity": "medium"  # Simplified
+            }
+            
+            return {
+                "success": True,
+                "path": path,
+                "analysis": analysis
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_deploy_agent(self, params: Dict) -> Dict[str, Any]:
+        """Deploy agent tool"""
+        if not self.swarm_manager:
+            return {"error": "Swarm not enabled"}
+        
+        try:
+            agent_type = params.get("agent_type", "")
+            config = params.get("config", {})
+            
+            if not agent_type:
+                return {"error": "Agent type required"}
+            
+            agent_id = await self.swarm_manager.deploy_agent(agent_type, config)
+            
+            return {
+                "success": True,
+                "agent_id": agent_id,
+                "agent_type": agent_type,
+                "status": "deployed"
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_get_swarm_status(self, params: Dict) -> Dict[str, Any]:
+        """Get swarm status tool"""
+        if not self.swarm_manager:
+            return {"error": "Swarm not enabled"}
+        
+        try:
+            status = await self.swarm_manager.get_status()
+            return {
+                "success": True,
+                "status": status
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_manage_conversation(self, params: Dict) -> Dict[str, Any]:
+        """Manage conversation tool"""
+        try:
+            action = params.get("action", "")
+            
+            if action == "save":
+                filepath = self.conversation_memory.save_to_file()
+                return {"success": True, "filepath": filepath}
+            elif action == "load":
+                filepath = params.get("filepath", "")
+                self.conversation_memory.load_from_file(filepath)
+                return {"success": True, "loaded": filepath}
+            elif action == "clear":
+                self.conversation_memory.clear()
+                return {"success": True, "cleared": True}
+            elif action == "summary":
+                summary = self.conversation_memory.get_summary()
+                return {"success": True, "summary": summary}
+            else:
+                return {"error": "Unknown action"}
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_create_artifact(self, params: Dict) -> Dict[str, Any]:
+        """Create artifact tool"""
+        try:
+            name = params.get("name", "")
+            content = params.get("content", "")
+            artifact_type = params.get("type", "text")
+            
+            if not name or not content:
+                return {"error": "Name and content required"}
+            
+            artifact_id = self.artifact_manager.create_artifact(name, content, artifact_type)
+            
+            return {
+                "success": True,
+                "artifact_id": artifact_id,
+                "name": name,
+                "type": artifact_type
+            }
+        except Exception as e:
+            return {"error": str(e)}
+    
+    async def _tool_get_artifact(self, params: Dict) -> Dict[str, Any]:
+        """Get artifact tool"""
+        try:
+            artifact_id = params.get("artifact_id", "")
+            if not artifact_id:
+                return {"error": "Artifact ID required"}
+            
+            artifact = self.artifact_manager.get_artifact(artifact_id)
+            if not artifact:
+                return {"error": "Artifact not found"}
+            
+            return {
+                "success": True,
+                "artifact": artifact
+            }
+        except Exception as e:
+            return {"error": str(e)}
 # End of ThorClient class
