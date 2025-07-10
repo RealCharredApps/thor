@@ -11,6 +11,10 @@ import anthropic
 from dataclasses import dataclass
 import sqlite3
 import uuid
+from dotenv import load_dotenv
+
+# Load .env file
+load_dotenv()
 
 @dataclass
 class Message:
