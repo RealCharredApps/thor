@@ -1,4 +1,4 @@
-# src/core/memory_manager.py
+# src/core/memory_manager.py - CORRECTED VERSION
 import json
 import sqlite3
 import asyncio
@@ -48,17 +48,6 @@ class MemoryManager:
             )
         """)
         
-        # User patterns table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS user_patterns (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pattern_type TEXT NOT NULL,
-                pattern_data TEXT NOT NULL,
-                frequency INTEGER DEFAULT 1,
-                last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        
         conn.commit()
         conn.close()
     
@@ -74,13 +63,15 @@ class MemoryManager:
             SELECT session_id, role, content, timestamp 
             FROM conversations 
             WHERE timestamp > datetime('now', '-7 days')
-            ORDER BY timestamp DESC
+            ORDER BY timestamp ASC
         """)
         
         for row in cursor.fetchall():
             session_id, role, content, timestamp = row
             if session_id not in self.conversation_cache:
                 self.conversation_cache[session_id] = []
+            
+            # Store with timestamp for internal use, but don't include in API calls
             self.conversation_cache[session_id].append({
                 "role": role,
                 "content": content,
@@ -114,8 +105,8 @@ class MemoryManager:
             self.conversation_cache[session_id] = []
         
         self.conversation_cache[session_id].extend([
-            {"role": "user", "content": user_message},
-            {"role": "assistant", "content": assistant_response}
+            {"role": "user", "content": user_message, "timestamp": datetime.now().isoformat()},
+            {"role": "assistant", "content": assistant_response, "timestamp": datetime.now().isoformat()}
         ])
         
         # Limit cache size
@@ -123,10 +114,19 @@ class MemoryManager:
             self.conversation_cache[session_id] = self.conversation_cache[session_id][-self.config.chat_memory_limit:]
     
     async def get_conversation_history(self, session_id: str) -> List[Dict]:
-        """Get conversation history for session"""
-        if session_id in self.conversation_cache:
-            return self.conversation_cache[session_id]
-        return []
+        """Get conversation history for session - API compatible format"""
+        if session_id not in self.conversation_cache:
+            return []
+        
+        # Return only role and content for API compatibility
+        api_messages = []
+        for msg in self.conversation_cache[session_id]:
+            api_messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
+        
+        return api_messages
     
     async def save_artifact(self, name: str, content: str, category: str = "general"):
         """Save artifact with metadata"""
@@ -173,20 +173,6 @@ class MemoryManager:
             }
         return None
     
-    async def learn_user_pattern(self, pattern_type: str, pattern_data: str):
-        """Learn from user patterns"""
-        conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT OR REPLACE INTO user_patterns (pattern_type, pattern_data, frequency, last_seen)
-            VALUES (?, ?, COALESCE((SELECT frequency FROM user_patterns WHERE pattern_type = ? AND pattern_data = ?), 0) + 1, CURRENT_TIMESTAMP)
-        """, (pattern_type, pattern_data, pattern_type, pattern_data))
-        
-        conn.commit()
-        conn.close()
-    
     async def save_all(self):
         """Save all cached data"""
-        # This could include additional cleanup and optimization
         self.logger.info("Memory saved successfully")

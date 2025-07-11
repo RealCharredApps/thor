@@ -4,6 +4,7 @@ import json
 from typing import Dict, Tuple, Optional
 from datetime import datetime, timedelta
 import logging
+from .config import ModelConfig
 
 class ModelSelector:
     """Intelligent model selection with cost optimization"""

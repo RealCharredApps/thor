@@ -2,7 +2,7 @@
 import os
 import json
 from typing import Dict, Any, Optional
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from pathlib import Path
 import logging
 
@@ -14,6 +14,9 @@ class ModelConfig:
     max_tokens: int
     best_for: list
     daily_limit: float = 5.0  # $5/month = ~$0.17/day
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 @dataclass
 class ThorConfig:
@@ -27,6 +30,16 @@ class ThorConfig:
     chat_memory_limit: int = 50
     artifact_memory_limit: int = 100
     
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            'max_daily_spend': self.max_daily_spend,
+            'enable_swarm': self.enable_swarm,
+            'argus_path': self.argus_path,
+            'log_level': self.log_level,
+            'chat_memory_limit': self.chat_memory_limit,
+            'artifact_memory_limit': self.artifact_memory_limit
+        }
+
 class ConfigManager:
     """Advanced configuration management"""
     
@@ -59,16 +72,21 @@ class ConfigManager:
         }
         
         if self.config_path.exists():
-            with open(self.config_path, 'r') as f:
-                data = json.load(f)
-                return ThorConfig(
-                    api_key=data.get('api_key', os.getenv('ANTHROPIC_API_KEY')),
-                    model_configs=default_models,
-                    max_daily_spend=data.get('max_daily_spend', 0.17),
-                    enable_swarm=data.get('enable_swarm', True),
-                    argus_path=data.get('argus_path'),
-                    log_level=data.get('log_level', 'INFO')
-                )
+            try:
+                with open(self.config_path, 'r') as f:
+                    data = json.load(f)
+                    return ThorConfig(
+                        api_key=data.get('api_key', os.getenv('ANTHROPIC_API_KEY')),
+                        model_configs=default_models,
+                        max_daily_spend=data.get('max_daily_spend', 0.17),
+                        enable_swarm=data.get('enable_swarm', True),
+                        argus_path=data.get('argus_path', os.getenv('ARGUS_PATH')),
+                        log_level=data.get('log_level', 'INFO'),
+                        chat_memory_limit=data.get('chat_memory_limit', 50),
+                        artifact_memory_limit=data.get('artifact_memory_limit', 100)
+                    )
+            except Exception as e:
+                print(f"Error loading config: {e}, using defaults")
         
         return ThorConfig(
             api_key=os.getenv('ANTHROPIC_API_KEY'),
@@ -79,12 +97,7 @@ class ConfigManager:
     def save_config(self):
         """Save current configuration"""
         with open(self.config_path, 'w') as f:
-            json.dump({
-                'max_daily_spend': self.config.max_daily_spend,
-                'enable_swarm': self.config.enable_swarm,
-                'argus_path': self.config.argus_path,
-                'log_level': self.config.log_level
-            }, f, indent=2)
+            json.dump(self.config.to_dict(), f, indent=2)
     
     def setup_logging(self):
         """Setup comprehensive logging"""

@@ -1,0 +1,8 @@
+{
+  "max_daily_spend": 0.17,
+  "enable_swarm": true,
+  "argus_path": "./Argus_Ai_Agent_MCPs",
+  "log_level": "INFO",
+  "chat_memory_limit": 50,
+  "artifact_memory_limit": 100
+}
