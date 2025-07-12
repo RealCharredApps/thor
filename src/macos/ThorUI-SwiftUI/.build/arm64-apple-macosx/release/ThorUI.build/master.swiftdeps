@@ -1,0 +1,13 @@
+version: "Apple Swift version 6.0.3 (swiftlang-6.0.3.1.10 clang-1600.0.30.1)"
+options: "cbba7b5aadc27b1d1f5cb2ca51a6f451a21f4c8ccf51ec67e200cbd6450948d1"
+build_start_time: [1752316795, 45925000]
+build_end_time: [1752316796, 136131000]
+inputs:
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/AppState.swift": !dirty [1752316712, 282719579]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ChatAreaView.swift": !dirty [1752231482, 722462675]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ContentView.swift": !dirty [1752316738, 888571528]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/HeaderView.swift": !dirty [1752229773, 163731940]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/InputAreaView.swift": !dirty [1752231501, 240353837]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/SettingsView.swift": !dirty [1752233081, 641021651]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/SidebarView.swift": !dirty [1752231511, 184048072]
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ThorApp.swift": !dirty [1752229737, 545431804]

@@ -1,0 +1,49 @@
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/BashCompletionsGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/CompletionsGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/FishCompletionsGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Completions/ZshCompletionsGenerator.swift
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Argument.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentDiscussion.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentHelp.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentVisibility.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/CompletionKind.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Errors.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Flag.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/NameSpecification.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/Option.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Properties/OptionGroup.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/AsyncParsableCommand.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/CommandGroup.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/EnumerableFlag.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ExpressibleByArgument.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableArguments.swift'
+'/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableCommand.swift'
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDecoder.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDefinition.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ArgumentSet.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/CommandParser.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/InputKey.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/InputOrigin.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/Name.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/Parsed.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ParsedValues.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/ParserError.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Parsing/SplitArguments.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/DumpHelpGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/HelpCommand.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/HelpGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/MessageInfo.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Usage/UsageGenerator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/CollectionExtensions.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Mutex.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Platform.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/SequenceExtensions.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/StringExtensions.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/SwiftExtensions.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Utilities/Tree.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/CodingKeyValidator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/NonsenseFlagsValidator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/ParsableArgumentsValidation.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/PositionalArgumentsValidator.swift
+/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParser/Validators/UniqueNamesValidator.swift

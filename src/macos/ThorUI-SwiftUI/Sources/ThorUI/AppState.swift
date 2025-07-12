@@ -1,4 +1,4 @@
-// src/macos/ThorUI-SwiftUI/Sources/ThorUI/AppState.swift - FIXED
+// src/macos/ThorUI-SwiftUI/Sources/ThorUI/AppState.swift - WORKING VERSION
 import SwiftUI
 import Foundation
 
@@ -10,9 +10,8 @@ class AppState: ObservableObject {
     @Published var isConnected: Bool = false
     @Published var showingSettings: Bool = false
     @Published var settings: ThorSettings = ThorSettings()
-    
     @Published var hasAPIKey: Bool = false
-
+    
     // Cost tracking
     @Published var dailyUsage: Double = 0.0
     @Published var dailyRequests: Int = 0
@@ -45,14 +44,8 @@ class AppState: ObservableObject {
         print("🚀 Initializing THOR connection...")
         connectToBackend()
         loadCostData()
-        
-        // Check API key status after connection
-        Task {
-            try? await Task.sleep(nanoseconds: 1_000_000_000) // Wait 1 second
-            await checkAPIKeyStatus()
-        }
     }
-
+    
     private func createDefaultSession() {
         sessions["default"] = SessionData(id: "default", name: "Default")
     }
@@ -66,13 +59,6 @@ class AppState: ObservableObject {
         
         Task {
             await startListening()
-        }
-        
-        // Send API key if available
-        if !settings.apiKey.isEmpty {
-            Task {
-                await sendAPIKey()
-            }
         }
     }
     
@@ -115,32 +101,6 @@ class AppState: ObservableObject {
         }
     }
     
-    private func sendAPIKey() async {
-        guard !settings.apiKey.isEmpty else { return }
-        
-        let message = BackendMessage(
-            type: "set_api_key",
-            api_key: settings.apiKey
-        )
-        
-        await sendToBackend(message)
-    }
-
-    func setAPIKey(_ apiKey: String, saveToFile: Bool = true) async {
-        let message = BackendMessage(
-            type: "set_api_key",
-            api_key: apiKey,
-            save_to_file: saveToFile
-        )
-        
-        await sendToBackend(message)
-    }
-    
-    func checkAPIKeyStatus() async {
-        let message = BackendMessage(type: "get_api_key_status")
-        await sendToBackend(message)
-    }
-    
     private func handleBackendMessage(_ messageText: String) async {
         do {
             let data = messageText.data(using: .utf8)!
@@ -152,25 +112,32 @@ class AppState: ObservableObject {
             case "connection_status":
                 if let status = response.status {
                     isConnected = (status == "connected")
-                    connectionRetryCount = 0 // Reset retry count on successful connection
+                    connectionRetryCount = 0
                     print("✅ Connection status: \(status)")
+                }
+                if let hasKey = response.has_api_key {
+                    hasAPIKey = hasKey
+                    print("🔑 Has API key: \(hasKey)")
                 }
                 
             case "api_key_status":
-            if let hasKey = response.has_api_key {
-                hasAPIKey = hasKey
-            }
-            
+                if let hasKey = response.has_api_key {
+                    hasAPIKey = hasKey
+                    print("🔑 API key status: \(hasKey)")
+                }
+                
             case "api_key_result":
                 if let success = response.success {
+                    print(success ? "✅ API key setup succeeded" : "❌ API key setup failed")
                     if success {
                         hasAPIKey = true
-                        addSystemMessage("✅ API key saved successfully!")
+                        addSystemMessage("✅ API key saved and THOR initialized successfully!")
                     } else {
                         let errorMsg = response.message ?? "API key setup failed"
                         addSystemMessage("❌ \(errorMsg)")
                     }
                 }
+                
             case "chat_response":
                 if let sessionId = response.session_id,
                    let responseContent = response.response {
@@ -182,6 +149,7 @@ class AppState: ObservableObject {
                     
                     sessions[sessionId]?.messages.append(assistantMessage)
                     sessions[sessionId]?.messageCount += 1
+                    print("✅ Added real THOR response")
                 }
                 isThinking = false
                 
@@ -226,8 +194,9 @@ class AppState: ObservableObject {
             
         } catch {
             print("❌ JSON parsing error: \(error)")
-            // Fall back to mock response
-            handleMockResponse(messageText)
+            // Don't fall back to mock - just show the error
+            addSystemMessage("❌ Backend communication error")
+            isThinking = false
         }
     }
     
@@ -240,14 +209,21 @@ class AppState: ObservableObject {
         sessions[currentSessionId]?.messageCount += 1
     }
     
-    private func handleMockResponse(_ originalMessage: String) {
-        let mockMessage = ChatMessage(
-            content: "🤖 Backend not connected - using mock response",
-            isUser: false
+    func setAPIKey(_ apiKey: String, saveToFile: Bool = true) async {
+        print("🔑 Setting API key...")
+        
+        let message = BackendMessage(
+            type: "set_api_key",
+            api_key: apiKey,
+            save_to_file: saveToFile
         )
-        sessions[currentSessionId]?.messages.append(mockMessage)
-        sessions[currentSessionId]?.messageCount += 1
-        isThinking = false
+        
+        await sendToBackend(message)
+    }
+    
+    func checkAPIKeyStatus() async {
+        let message = BackendMessage(type: "get_api_key_status")
+        await sendToBackend(message)
     }
     
     func sendMessage(_ content: String, attachments: [URL] = []) async {
@@ -265,7 +241,7 @@ class AppState: ObservableObject {
         sessions[currentSessionId]?.messages.append(userMessage)
         sessions[currentSessionId]?.messageCount += 1
         
-        // Send to backend or mock
+        // Send to backend if connected, otherwise show error
         if isConnected {
             let message = BackendMessage(
                 type: "chat",
@@ -276,13 +252,13 @@ class AppState: ObservableObject {
             
             await sendToBackend(message)
         } else {
-            // Mock response
-            DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                let mockResponse = ChatMessage(
-                    content: "THOR response to: \(content)",
+            // Show connection error instead of mock
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                let errorResponse = ChatMessage(
+                    content: "❌ Not connected to THOR backend. Please check connection.",
                     isUser: false
                 )
-                self.sessions[self.currentSessionId]?.messages.append(mockResponse)
+                self.sessions[self.currentSessionId]?.messages.append(errorResponse)
                 self.sessions[self.currentSessionId]?.messageCount += 1
                 self.isThinking = false
             }
@@ -314,17 +290,6 @@ class AppState: ObservableObject {
         }
     }
     
-    func updateAPIKey(_ newKey: String) {
-        settings.apiKey = newKey
-        saveSettings()
-        
-        if isConnected {
-            Task {
-                await sendAPIKey()
-            }
-        }
-    }
-    
     func createNewSession() {
         let sessionId = "session_\(Int.random(in: 1000...9999))"
         sessions[sessionId] = SessionData(id: sessionId, name: "Session \(sessions.count + 1)")
@@ -353,12 +318,7 @@ class AppState: ObservableObject {
                 )
                 await sendToBackend(message)
             } else {
-                let mockResponse = ChatMessage(
-                    content: "🔧 \(toolName): Mock tool result (backend not connected)",
-                    isUser: false
-                )
-                sessions[currentSessionId]?.messages.append(mockResponse)
-                sessions[currentSessionId]?.messageCount += 1
+                addSystemMessage("❌ Not connected to backend")
             }
         }
     }
@@ -411,7 +371,7 @@ class AppState: ObservableObject {
     }
 }
 
-// Backend communication models
+// Updated Backend Message
 struct BackendMessage: Codable {
     let type: String
     let session_id: String?
@@ -434,6 +394,7 @@ struct BackendMessage: Codable {
     }
 }
 
+// Updated Backend Response
 struct BackendResponse: Codable {
     let type: String
     let session_id: String?
@@ -451,8 +412,10 @@ struct BackendResponse: Codable {
     let has_api_key: Bool?
     let saved_to_file: Bool?
     let api_key_source: String?
+    let thor_ready: Bool?
 }
 
+// Keep existing data models
 struct SessionData {
     let id: String
     let name: String

@@ -1,0 +1,12 @@
+{
+  "": {
+    "dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/ArgumentParserToolInfo.d",
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/ArgumentParserToolInfo.o",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/master.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Sources/ArgumentParserToolInfo/ToolInfo.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/ToolInfo.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/ToolInfo~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParserToolInfo-tool.build/ToolInfo.swiftdeps"
+  }
+}

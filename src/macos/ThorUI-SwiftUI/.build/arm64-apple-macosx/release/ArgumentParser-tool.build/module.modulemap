@@ -1,0 +1,4 @@
+module ArgumentParser {
+    header "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ArgumentParser-tool.build/ArgumentParser-Swift.h"
+    requires objc
+}

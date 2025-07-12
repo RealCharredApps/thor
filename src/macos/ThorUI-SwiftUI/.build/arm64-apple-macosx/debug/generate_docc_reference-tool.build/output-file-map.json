@@ -1,0 +1,23 @@
+{
+  "": {
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/master.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Tools/generate-docc-reference/Extensions/ArgumentParser+Markdown.swift": {
+    "dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/ArgumentParser+Markdown.d",
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/ArgumentParser+Markdown.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/ArgumentParser+Markdown~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/ArgumentParser+Markdown.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Tools/generate-docc-reference/Extensions/Process+SimpleAPI.swift": {
+    "dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/Process+SimpleAPI.d",
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/Process+SimpleAPI.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/Process+SimpleAPI~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/Process+SimpleAPI.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/checkouts/swift-argument-parser/Tools/generate-docc-reference/GenerateDoccReference.swift": {
+    "dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/GenerateDoccReference.d",
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/GenerateDoccReference.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/GenerateDoccReference~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/debug/generate_docc_reference-tool.build/GenerateDoccReference.swiftdeps"
+  }
+}

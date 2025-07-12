@@ -1,0 +1,47 @@
+{
+  "": {
+    "dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ThorUI.d",
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ThorUI.o",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/master.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/AppState.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/AppState.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/AppState~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/AppState.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ChatAreaView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ChatAreaView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ChatAreaView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ChatAreaView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ContentView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ContentView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ContentView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ContentView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/HeaderView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/HeaderView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/HeaderView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/HeaderView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/InputAreaView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/InputAreaView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/InputAreaView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/InputAreaView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/SettingsView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SettingsView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SettingsView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SettingsView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/SidebarView.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SidebarView.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SidebarView~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/SidebarView.swiftdeps"
+  },
+  "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/Sources/ThorUI/ThorApp.swift": {
+    "object": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ThorApp.swift.o",
+    "swiftmodule": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ThorApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/bbm2/Documents/GitHub/RealCharredApps/thor/src/macos/ThorUI-SwiftUI/.build/arm64-apple-macosx/release/ThorUI.build/ThorApp.swiftdeps"
+  }
+}
